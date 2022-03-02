@@ -1,3 +1,10 @@
+all: ao.vegen ao.llvm rt.vegen rt.llvm options.vegen options.llvm stencil.vegen stencil.llvm volume.vegen volume.llvm
+
+clean:
+	rm -rf *.o *.vegen *.llvm
+
+.PHONY: all clean
+
 %.vegen.o: %.cpp
 	vegen-clang++ -O3 -march=native -ffast-math $^ -o $@ -c
 
@@ -32,6 +39,3 @@ run-stencil: stencil.vegen stencil.llvm
 run-volume: volume.vegen volume.llvm
 	./volume.vegen camera.dat density_lowres.vol
 	./volume.llvm camera.dat density_lowres.vol
-
-clean:
-	rm -rf *.o *.vegen *.llvm
