@@ -36,6 +36,10 @@ run-stencil: stencil.vegen stencil.llvm
 	./stencil.vegen
 	./stencil.llvm
 
+run-mandelbrot: mandelbrot.vegen mandelbrot.llvm
+	./mandelbrot.vegen
+	./mandelbrot.llvm
+
 run-volume: volume.vegen volume.llvm
 	./volume.vegen camera.dat density_lowres.vol
 	./volume.llvm camera.dat density_lowres.vol
