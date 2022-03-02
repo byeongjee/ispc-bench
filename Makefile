@@ -4,6 +4,9 @@
 %.llvm.o: %.cpp
 	clang++ -O3 -march=native -ffast-math $^ -o $@ -c
 
+test-%.o: test-%.cpp
+	clang++ -O1 $^ -o $@ -c
+
 %.llvm: %_serial.llvm.o test-%.o
 	clang++ $^ -o $@
 
