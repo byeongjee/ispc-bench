@@ -1,4 +1,4 @@
-all: ao.vegen ao.llvm rt.vegen rt.llvm options.vegen options.llvm stencil.vegen stencil.llvm volume.vegen volume.llvm
+all: ao.vegen ao.llvm rt.vegen rt.llvm options.vegen options.llvm stencil.vegen stencil.llvm mandelbrot.vegen mandelbrot.llvm volume.vegen volume.llvm 
 
 clean:
 	rm -rf *.o *.vegen *.llvm
