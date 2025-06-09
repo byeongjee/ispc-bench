@@ -1,3 +1,5 @@
+#include "mandelbrot_serial.h"
+
 static int mandel(float c_re, float c_im, int count) {
     float z_re = c_re, z_im = c_im;
     int i;
@@ -14,7 +16,17 @@ static int mandel(float c_re, float c_im, int count) {
     return i;
 }
 
-void mandelbrot_serial(float x0, float y0, float x1, float y1, int width, int height, int maxIterations, int output[]) {
+void mandelbrot_serial(int output[]) {
+    int maxIterations = 256;
+
+    unsigned int width = 768;
+    unsigned int height = 512;
+
+    float x0 = -2;
+    float x1 = 1;
+    float y0 = -1;
+    float y1 = 1;
+
     float dx = (x1 - x0) / width;
     float dy = (y1 - y0) / height;
 

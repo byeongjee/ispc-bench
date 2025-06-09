@@ -45,32 +45,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
-
-struct Triangle {
-    float p[3][4]; // extra float pad after each vertex
-    int32_t id;
-    int32_t pad[3]; // make 16 x 32-bits
-};
-
-struct LinearBVHNode {
-    float bounds[2][3];
-    int32_t offset; // primitives for leaf, second child for interior
-    uint8_t nPrimitives;
-    uint8_t splitAxis;
-    uint16_t pad;
-};
+#include "rt_serial.h"
 
 
-typedef unsigned int uint;
-
-void raytrace_serial(int width, int height, int baseWidth, int baseHeight, 
-                     //const float raster2camera[__restrict__ 4][4],
-                     //const float camera2world[__restrict__ 4][4],
-                     float *__restrict__ raster2camera_ptr,
-                     float *__restrict__ camera2world_ptr,
-
-                     float *__restrict__ image, int *__restrict__ id, const LinearBVHNode *__restrict__ nodes,
-                     const Triangle *__restrict__ triangles);
 
 static void writeImage(int *idImage, float *depthImage, int width, int height, const char *filename) {
     FILE *f = fopen(filename, "wb");
@@ -113,23 +90,9 @@ static void usage() {
     exit(1);
 }
 
-int main(int argc, char *argv[]) {
-    static unsigned int test_iterations[] = {3, 7, 1};
+int main() {
     float scale = 1.f;
-    const char *filename = NULL;
-    if (argc < 2)
-        usage();
-    filename = argv[1];
-    if (argc > 2) {
-        if (strncmp(argv[2], "--scale=", 8) == 0) {
-            scale = atof(argv[2] + 8);
-        }
-    }
-    if ((argc == 6) || (argc == 5)) {
-        for (int i = 0; i < 3; i++) {
-            test_iterations[i] = atoi(argv[argc - 3 + i]);
-        }
-    }
+    const char *filename = "/home/t-bykang/ispc-bench/sponza";
 
 #define READ(var, n)                                                                                                   \
     if (fread(&(var), sizeof(var), n, f) != (unsigned int)n) {                                                         \
@@ -158,6 +121,10 @@ int main(int argc, char *argv[]) {
     READ(baseHeight, 1);
     READ(camera2world[0][0], 16);
     READ(raster2camera[0][0], 16);
+
+    // We hardcode baseWidth and baseHeight
+    // to allow easier analysis
+    assert(baseWidth == 900 && baseHeight == 900);
 
     //
     // Read in the serialized BVH
@@ -217,65 +184,64 @@ int main(int argc, char *argv[]) {
 
     // allocate images; one to hold hit object ids, one to hold depth to
     // the first interseciton
-    int *id = new int[width * height];
-    float *image = new float[width * height];
+    int *id = new int[WIDTH * HEIGHT];
+    float *image = new float[WIDTH * HEIGHT];
 
-#if 0
-    //
-    // Run 3 iterations with ispc + 1 core, record the minimum time
-    //
-    double minTimeISPC = 1e30;
-    for (uint i = 0; i < test_iterations[0]; ++i) {
-        reset_and_start_timer();
-        raytrace_ispc(width, height, baseWidth, baseHeight, raster2camera, camera2world, image, id, nodes, triangles);
-        double dt = get_elapsed_mcycles();
-        printf("@time of ISPC run:\t\t\t[%.3f] million cycles\n", dt);
-        minTimeISPC = std::min(dt, minTimeISPC);
-    }
-    printf("[rt ispc, 1 core]:\t\t[%.3f] million cycles for %d x %d image\n", minTimeISPC, width, height);
+    memset(id, 0, WIDTH * HEIGHT * sizeof(int));
+    memset(image, 0, WIDTH * HEIGHT * sizeof(float));
 
-    writeImage(id, image, width, height, "rt-ispc-1core.ppm");
+    // Create MemRefDescriptors for the images and the matrices
+    MemRefDescriptor<float, 2> raster2camera_desc = {
+        .allocated = &raster2camera[0][0],
+        .aligned = &raster2camera[0][0],
+        .offset = 0,
+        .sizes = {4, 4},
+        .strides = {4, 1}
+    };
+    MemRefDescriptor<float, 2> camera2world_desc = {
+        .allocated = &camera2world[0][0],
+        .aligned = &camera2world[0][0],
+        .offset = 0,
+        .sizes = {4, 4},
+        .strides = {4, 1}
+    };
+    MemRefDescriptor<float, 2> image_desc = {
+        .allocated = image,
+        .aligned = image,
+        .offset = 0,
+        .sizes = {WIDTH, HEIGHT},
+        .strides = {WIDTH, 1}
+    };
+    MemRefDescriptor<int, 2> id_desc = {
+        .allocated = id,
+        .aligned = id,
+        .offset = 0,
+        .sizes = {WIDTH, HEIGHT},
+        .strides = {WIDTH, 1}
+    };
+    MemRefDescriptor<LinearBVHNode, 1> nodes_desc = {
+        .allocated = nodes,
+        .aligned = nodes,
+        .offset = 0,
+        .sizes = {nNodes},
+        .strides = {1}
+    };
+    MemRefDescriptor<Triangle, 1> triangles_desc = {
+        .allocated = triangles,
+        .aligned = triangles,
+        .offset = 0,
+        .sizes = {nTris},
+        .strides = {1}
+    };
 
-    memset(id, 0, width * height * sizeof(int));
-    memset(image, 0, width * height * sizeof(float));
-
-    //
-    // Run 3 iterations with ispc + 1 core, record the minimum time
-    //
-    double minTimeISPCtasks = 1e30;
-    for (uint i = 0; i < test_iterations[1]; ++i) {
-        reset_and_start_timer();
-        raytrace_ispc_tasks(width, height, baseWidth, baseHeight, raster2camera, camera2world, image, id, nodes,
-                            triangles);
-        double dt = get_elapsed_mcycles();
-        printf("@time of ISPC + TASKS run:\t\t\t[%.3f] million cycles\n", dt);
-        minTimeISPCtasks = std::min(dt, minTimeISPCtasks);
-    }
-    printf("[rt ispc + tasks]:\t\t[%.3f] million cycles for %d x %d image\n", minTimeISPCtasks, width, height);
-
-    writeImage(id, image, width, height, "rt-ispc-tasks.ppm");
-#endif
-
-    memset(id, 0, width * height * sizeof(int));
-    memset(image, 0, width * height * sizeof(float));
-
-    //
-    // And 3 iterations with the serial implementation, reporting the
-    // minimum time.
-    //
-    double minTimeSerial = 1e30;
-    for (uint i = 0; i < test_iterations[2]; ++i) {
-        reset_and_start_timer();
-        raytrace_serial(width, height, baseWidth, baseHeight, &raster2camera[0][0], &camera2world[0][0], image, id, nodes, triangles);
-        double dt = get_elapsed_mcycles();
-        printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
-        minTimeSerial = std::min(dt, minTimeSerial);
-    }
-    printf("[rt serial]:\t\t\t[%.3f] million cycles for %d x %d image\n", minTimeSerial, width, height);
-#if 0
-    printf("\t\t\t\t(%.2fx speedup from ISPC, %.2fx speedup from ISPC + tasks)\n", minTimeSerial / minTimeISPC,
-           minTimeSerial / minTimeISPCtasks);
-#endif
+    reset_and_start_timer();
+    #ifdef INTRINSIC_COMPILER
+        _mlir_ciface_rt_serial(&raster2camera_desc, &camera2world_desc, &image_desc, &id_desc, &nodes_desc, &triangles_desc);
+    #else
+        rt_serial(&raster2camera[0][0], &camera2world[0][0], image, id, nodes, triangles);
+    #endif
+    double dt = get_elapsed_mcycles();
+    printf ("[execution time] %0.6f\n", dt);
 
     writeImage(id, image, width, height, "rt-serial.ppm");
 

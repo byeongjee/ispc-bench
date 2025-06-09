@@ -41,6 +41,7 @@
 #include <algorithm>
 #include <stdint.h>
 #include <iostream>
+#include "rt_serial.h"
 
 struct float3 {
     float3() {}
@@ -63,21 +64,6 @@ struct Ray {
     unsigned int dirIsNeg[3];
     float mint, maxt;
     int hitId;
-};
-
-// Declare these in a namespace so the mangling matches
-struct Triangle {
-    float p[3][4]; // extra float pad after each vertex
-    int32_t id;
-    int32_t pad[3]; // make 16 x 32-bits
-};
-
-struct LinearBVHNode {
-    float bounds[2][3];
-    int32_t offset; // primitives for leaf, second child for interior
-    uint8_t nPrimitives;
-    uint8_t splitAxis;
-    uint16_t pad;
 };
 
 
@@ -253,7 +239,7 @@ bool BVHIntersect(const LinearBVHNode *__restrict__ nodes, const Triangle *__res
     return hit;
 }
 
-void raytrace_serial(int width, int height, int baseWidth, int baseHeight, 
+void rt_serial(
                      //const float raster2camera[__restrict__ 4][4],
                      //const float camera2world[__restrict__ 4][4],
                      float *__restrict__ raster2camera_ptr,
@@ -262,16 +248,16 @@ void raytrace_serial(int width, int height, int baseWidth, int baseHeight,
                      float *__restrict__ image, int *__restrict__ id, const LinearBVHNode *__restrict__ nodes,
                      const Triangle *__restrict__ triangles) {
 
-    float widthScale = float(baseWidth) / float(width);
-    float heightScale = float(baseHeight) / float(height);
+    float widthScale = float(BASE_WIDTH) / float(WIDTH);
+    float heightScale = float(BASE_HEIGHT) / float(HEIGHT);
 
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
+    for (int y = 0; y < HEIGHT; ++y) {
+        for (int x = 0; x < WIDTH; ++x) {
             Ray ray;
             generateRay(raster2camera_ptr, camera2world_ptr, x * widthScale, y * heightScale, ray);
             BVHIntersect(nodes, triangles, ray);
 
-            int offset = y * width + x;
+            int offset = y * WIDTH + x;
             image[offset] = ray.maxt;
             id[offset] = ray.hitId;
         }

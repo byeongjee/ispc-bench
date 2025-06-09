@@ -52,12 +52,10 @@
 #include <sys/types.h>
 
 #include "timing.h"
+#include "ao_serial.h"
 
 #define NSUBSAMPLES 2
 
-extern void ao_serial(int w, int h, int nsubsamples, float image[]);
-
-static unsigned int test_iterations[] = {3, 7, 1};
 static unsigned int width, height;
 static unsigned char *img;
 static float *fimg;
@@ -96,89 +94,30 @@ static void savePPM(const char *fname, int w, int h) {
     printf("Wrote image file %s\n", fname);
 }
 
-int main(int argc, char **argv) {
-    if (argc < 3) {
-        printf("%s\n", argv[0]);
-        printf("Usage: ao [width] [height] [ispc iterations] [tasks iterations] [serial iterations]\n");
-        getchar();
-        exit(-1);
-    } else {
-        if (argc == 6) {
-            for (int i = 0; i < 3; i++) {
-                test_iterations[i] = atoi(argv[3 + i]);
-            }
-        }
-        width = atoi(argv[1]);
-        height = atoi(argv[2]);
-    }
 
-    // Allocate space for output images
-    img = new unsigned char[width * height * 3];
-    fimg = new float[width * height * 3];
 
-#if 0
-    //
-    // Run the ispc path, test_iterations times, and report the minimum
-    // time for any of them.
-    //
-    double minTimeISPC = 1e30;
-    for (unsigned int i = 0; i < test_iterations[0]; i++) {
-        memset((void *)fimg, 0, sizeof(float) * width * height * 3);
-        assert(NSUBSAMPLES == 2);
+int main() {
+  // Allocate space for output images
+  img = new unsigned char[WIDTH * HEIGHT * 3];
+  fimg = new float[WIDTH * HEIGHT * 3];
 
-        reset_and_start_timer();
-        ao_ispc(width, height, NSUBSAMPLES, fimg);
-        double t = get_elapsed_mcycles();
-        printf("@time of ISPC run:\t\t\t[%.3f] million cycles\n", t);
-        minTimeISPC = std::min(minTimeISPC, t);
-    }
+  MemRefDescriptor<float, 3> fimg_desc = {
+      fimg, fimg, 0,
+      {HEIGHT, WIDTH, 3}, // sizes
+      {WIDTH * 3, 3, 1}   // strides
+  };
 
-    // Report results and save image
-    printf("[aobench ispc]:\t\t\t[%.3f] million cycles (%d x %d image)\n", minTimeISPC, width, height);
-    savePPM("ao-ispc.ppm", width, height);
+  memset((void *)fimg, 0, sizeof(float) * WIDTH * HEIGHT * 3);
+  reset_and_start_timer();
+  #ifdef INTRINSIC_COMPILER
+    _mlir_ciface_ao_serial(NSUBSAMPLES, &fimg_desc);
+  #else
+    ao_serial(NSUBSAMPLES, fimg);
+  #endif
+  double t = get_elapsed_mcycles();
+  printf ("[execution time] %0.6f\n", t);
 
-    //
-    // Run the ispc + tasks path, test_iterations times, and report the
-    // minimum time for any of them.
-    //
-    double minTimeISPCTasks = 1e30;
-    for (unsigned int i = 0; i < test_iterations[1]; i++) {
-        memset((void *)fimg, 0, sizeof(float) * width * height * 3);
-        assert(NSUBSAMPLES == 2);
+  savePPM("ao-serial.ppm", WIDTH, HEIGHT);
 
-        reset_and_start_timer();
-        ao_ispc_tasks(width, height, NSUBSAMPLES, fimg);
-        double t = get_elapsed_mcycles();
-        printf("@time of ISPC + TASKS run:\t\t\t[%.3f] million cycles\n", t);
-        minTimeISPCTasks = std::min(minTimeISPCTasks, t);
-    }
-
-    // Report results and save image
-    printf("[aobench ispc + tasks]:\t\t[%.3f] million cycles (%d x %d image)\n", minTimeISPCTasks, width, height);
-    savePPM("ao-ispc-tasks.ppm", width, height);
-#endif
-
-    //
-    // Run the serial path, again test_iteration times, and report the
-    // minimum time.
-    //
-    double minTimeSerial = 1e30;
-    for (unsigned int i = 0; i < test_iterations[2]; i++) {
-        memset((void *)fimg, 0, sizeof(float) * width * height * 3);
-        reset_and_start_timer();
-        ao_serial(width, height, NSUBSAMPLES, fimg);
-        double t = get_elapsed_mcycles();
-        printf("@time of serial run:\t\t\t\t[%.3f] million cycles\n", t);
-        minTimeSerial = std::min(minTimeSerial, t);
-    }
-
-    // Report more results, save another image...
-    printf("[aobench serial]:\t\t[%.3f] million cycles (%d x %d image)\n", minTimeSerial, width, height);
-#if 0
-    printf("\t\t\t\t(%.2fx speedup from ISPC, %.2fx speedup from ISPC + tasks)\n", minTimeSerial / minTimeISPC,
-           minTimeSerial / minTimeISPCTasks);
-#endif
-    savePPM("ao-serial.ppm", width, height);
-
-    return 0;
+  return 0;
 }

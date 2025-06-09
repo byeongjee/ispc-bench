@@ -42,27 +42,13 @@
 using std::max;
 
 #include "timing.h"
+#include "options_serial.h"
 
 //using namespace ispc;
 
-extern void black_scholes_serial(float Sa[], float Xa[], float Ta[], float ra[], float va[], float result[], int count);
 
-extern void binomial_put_serial(float Sa[], float Xa[], float Ta[], float ra[], float va[], float result[], int count);
-
-static void usage() { printf("usage: options [--count=<num options>]\n"); }
-
-int main(int argc, char *argv[]) {
+int main() {
     int nOptions = 128 * 1024;
-
-    for (int i = 1; i < argc; ++i) {
-        if (strncmp(argv[i], "--count=", 8) == 0) {
-            nOptions = atoi(argv[i] + 8);
-            if (nOptions <= 0) {
-                usage();
-                exit(1);
-            }
-        }
-    }
 
     float *S = new float[nOptions];
     float *X = new float[nOptions];
@@ -70,6 +56,53 @@ int main(int argc, char *argv[]) {
     float *r = new float[nOptions];
     float *v = new float[nOptions];
     float *result = new float[nOptions];
+
+    MemRefDescriptor<float, 1> S_desc = {
+        .allocated = S,
+        .aligned = S,
+        .offset = 0,
+        .sizes = {nOptions},
+        .strides = {1}
+    };
+    MemRefDescriptor<float, 1> X_desc = {
+        .allocated = X,
+        .aligned = X,
+        .offset = 0,
+        .sizes = {nOptions},
+        .strides = {1}
+    };
+
+    MemRefDescriptor<float, 1> T_desc = {
+        .allocated = T,
+        .aligned = T,
+        .offset = 0,
+        .sizes = {nOptions},
+        .strides = {1}
+    };
+    MemRefDescriptor<float, 1> r_desc = {
+        .allocated = r,
+        .aligned = r,
+        .offset = 0,
+        .sizes = {nOptions},
+        .strides = {1}
+    };
+    MemRefDescriptor<float, 1> v_desc = {
+        .allocated = v,
+        .aligned = v,
+        .offset = 0,
+        .sizes = {nOptions},
+        .strides = {1}
+    };
+    MemRefDescriptor<float, 1> result_desc = {
+        .allocated = result,
+        .aligned = result,
+        .offset = 0,
+        .sizes = {nOptions},
+        .strides = {1}
+    };
+
+
+
 
     for (int i = 0; i < nOptions; ++i) {
         S[i] = 100; // stock price
@@ -82,106 +115,37 @@ int main(int argc, char *argv[]) {
     double sum;
 
     //
-    // Binomial options pricing model, ispc implementation
-    //
-#if 0
-    double binomial_ispc = 1e30;
-    for (int i = 0; i < 3; ++i) {
-        reset_and_start_timer();
-        binomial_put_ispc(S, X, T, r, v, result, nOptions);
-        double dt = get_elapsed_mcycles();
-        sum = 0.;
-        for (int i = 0; i < nOptions; ++i)
-            sum += result[i];
-        binomial_ispc = std::min(binomial_ispc, dt);
-    }
-    printf("[binomial ispc, 1 thread]:\t[%.3f] million cycles (avg %f)\n", binomial_ispc, sum / nOptions);
-
-    //
-    // Binomial options pricing model, ispc implementation, tasks
-    //
-    double binomial_tasks = 1e30;
-    for (int i = 0; i < 3; ++i) {
-        reset_and_start_timer();
-        binomial_put_ispc_tasks(S, X, T, r, v, result, nOptions);
-        double dt = get_elapsed_mcycles();
-        sum = 0.;
-        for (int i = 0; i < nOptions; ++i)
-            sum += result[i];
-        binomial_tasks = std::min(binomial_tasks, dt);
-    }
-    printf("[binomial ispc, tasks]:\t\t[%.3f] million cycles (avg %f)\n", binomial_tasks, sum / nOptions);
-#endif
-
-    //
     // Binomial options, serial implementation
     //
-    double binomial_serial = 1e30;
-    for (int i = 0; i < 3; ++i) {
-        reset_and_start_timer();
-        binomial_put_serial(S, X, T, r, v, result, nOptions);
-        double dt = get_elapsed_mcycles();
-        sum = 0.;
-        for (int i = 0; i < nOptions; ++i)
-            sum += result[i];
-        binomial_serial = std::min(binomial_serial, dt);
+    reset_and_start_timer();
+    #ifdef INTRINSIC_COMPILER
+        _mlir_ciface_options_serial(&S_desc, &X_desc, &T_desc, &r_desc, &v_desc, &result_desc, nOptions, false);
+    #else
+        options_serial(S, X, T, r, v, result, nOptions, false);
+    #endif
+    double binomial_serial = get_elapsed_mcycles();
+    sum = 0.;
+    for (int i = 0; i < nOptions; ++i) {
+        sum += result[i];
     }
-    printf("[binomial serial]:\t\t[%.3f] million cycles (avg %f)\n", binomial_serial, sum / nOptions);
+    // printf("[binomial serial]:\t\t[%.3f] million cycles (avg %f)\n", binomial_serial, sum / nOptions);
 
-#if 0
-    printf("\t\t\t\t(%.2fx speedup from ISPC, %.2fx speedup from ISPC + tasks)\n", binomial_serial / binomial_ispc,
-           binomial_serial / binomial_tasks);
 
-    //
-    // Black-Scholes options pricing model, ispc implementation, 1 thread
-    //
-    double bs_ispc = 1e30;
-    for (int i = 0; i < 3; ++i) {
-        reset_and_start_timer();
-        black_scholes_ispc(S, X, T, r, v, result, nOptions);
-        double dt = get_elapsed_mcycles();
-        sum = 0.;
-        for (int i = 0; i < nOptions; ++i)
-            sum += result[i];
-        bs_ispc = std::min(bs_ispc, dt);
+    reset_and_start_timer();
+    #ifdef INTRINSIC_COMPILER
+        _mlir_ciface_options_serial(&S_desc, &X_desc, &T_desc, &r_desc, &v_desc, &result_desc, nOptions, true);
+    #else
+        options_serial(S, X, T, r, v, result, nOptions, true);
+    #endif
+    double bs_serial = get_elapsed_mcycles();
+    sum = 0.;
+    for (int i = 0; i < nOptions; ++i) {
+        sum += result[i];
     }
-    printf("[black-scholes ispc, 1 thread]:\t[%.3f] million cycles (avg %f)\n", bs_ispc, sum / nOptions);
 
-    //
-    // Black-Scholes options pricing model, ispc implementation, tasks
-    //
-    double bs_ispc_tasks = 1e30;
-    for (int i = 0; i < 3; ++i) {
-        reset_and_start_timer();
-        black_scholes_ispc_tasks(S, X, T, r, v, result, nOptions);
-        double dt = get_elapsed_mcycles();
-        sum = 0.;
-        for (int i = 0; i < nOptions; ++i)
-            sum += result[i];
-        bs_ispc_tasks = std::min(bs_ispc_tasks, dt);
-    }
-    printf("[black-scholes ispc, tasks]:\t[%.3f] million cycles (avg %f)\n", bs_ispc_tasks, sum / nOptions);
-#endif
+    double total = binomial_serial + bs_serial;
+    printf ("[execution time] %0.6f\n", total);
 
-    //
-    // Black-Scholes options pricing model, serial implementation
-    //
-    double bs_serial = 1e30;
-    for (int i = 0; i < 3; ++i) {
-        reset_and_start_timer();
-        black_scholes_serial(S, X, T, r, v, result, nOptions);
-        double dt = get_elapsed_mcycles();
-        sum = 0.;
-        for (int i = 0; i < nOptions; ++i)
-            sum += result[i];
-        bs_serial = std::min(bs_serial, dt);
-    }
-    printf("[black-scholes serial]:\t\t[%.3f] million cycles (avg %f)\n", bs_serial, sum / nOptions);
-
-#if 0
-    printf("\t\t\t\t(%.2fx speedup from ISPC, %.2fx speedup from ISPC + tasks)\n", bs_serial / bs_ispc,
-           bs_serial / bs_ispc_tasks);
-#endif
 
     return 0;
 }

@@ -1,15 +1,24 @@
 all: ao.vegen ao.llvm rt.vegen rt.llvm options.vegen options.llvm stencil.vegen stencil.llvm mandelbrot.vegen mandelbrot.llvm volume.vegen volume.llvm 
 
+VEGEN_CXX = /home/t-bykang/vegen/build/vegen-clang++
+VEGEN_C = /home/t-bykang/vegen/build/vegen-clang
+
 clean:
 	rm -rf *.o *.vegen *.llvm
 
 .PHONY: all clean
 
 %.vegen.o: %.cpp
-	vegen-clang++ -O3 -march=native -ffast-math $^ -o $@ -c
+	$(VEGEN_CXX) -O3 -march=native -ffast-math $^ -o $@ -c
+
+%.vegen.ll: %.cpp
+	$(VEGEN_CXX) -O3 -S -emit-llvm -ffast-math $^ -o $@ -c
 
 %.llvm.o: %.cpp
 	clang++ -O3 -march=native -ffast-math $^ -o $@ -c
+
+%.llvm.ll: %.cpp
+	clang++ -O3 -S -emit-llvm -ffast-math $^ -o $@ -c
 
 test-%.o: test-%.cpp
 	clang++ -O1 $^ -o $@ -c

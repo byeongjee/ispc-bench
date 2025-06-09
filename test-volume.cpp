@@ -42,10 +42,9 @@
 #include <algorithm>
 #include <cstdlib>
 #include <stdio.h>
+#include "volume_serial.h"
 //using namespace ispc;
 
-extern void volume_serial(float *__restrict__ density, int *__restrict__ nVoxels, const float *__restrict__ raster2camera_ptr, const float *__restrict__ camera2world_ptr,
-                   int width, int height, float *__restrict__ image);
 
 /* Write a PPM image file with the image */
 static void writePPM(float *buf, int width, int height, const char *fn) {
@@ -127,92 +126,69 @@ static float *loadVolume(const char *fn, int n[3]) {
     return v;
 }
 
-int main(int argc, char *argv[]) {
-    static unsigned int test_iterations[] = {3, 7, 1};
-    if (argc < 3) {
-        fprintf(stderr, "usage: volume <camera.dat> <volume_density.vol> [ispc iterations] [tasks iterations] [serial "
-                        "iterations]\n");
-        return 1;
-    }
-    if (argc == 6) {
-        for (int i = 0; i < 3; i++) {
-            test_iterations[i] = atoi(argv[3 + i]);
-        }
-    }
+int main() {
+    const char* camera_filename = "/home/t-bykang/ispc-bench/camera.dat";
+    const char* density_filename = "/home/t-bykang/ispc-bench/density_lowres.vol";
 
     //
     // Load viewing data and the volume density data
     //
     int width, height;
     float raster2camera[4][4], camera2world[4][4];
-    loadCamera(argv[1], &width, &height, raster2camera, camera2world);
+    loadCamera(camera_filename, &width, &height, raster2camera, camera2world);
     float *image = new float[width * height];
 
     int n[3];
-    float *density = loadVolume(argv[2], n);
+    float *density = loadVolume(density_filename, n);
 
-#if 0
-    //
-    // Compute the image using the ispc implementation; report the minimum
-    // time of three runs.
-    //
-    double minISPC = 1e30;
-    for (unsigned int i = 0; i < test_iterations[0]; ++i) {
-        reset_and_start_timer();
-        volume_ispc(density, n, raster2camera, camera2world, width, height, image);
-        double dt = get_elapsed_mcycles();
-        printf("@time of ISPC run:\t\t\t[%.3f] million cycles\n", dt);
-        minISPC = std::min(minISPC, dt);
-    }
+    MemRefDescriptor<float, 1> density_desc = {
+        .allocated = density,
+        .aligned = density,
+        .offset = 0,
+        .sizes = {n[0] * n[1] * n[2]},
+        .strides = {1}
+    };
+    MemRefDescriptor<int, 1> nVoxels_desc = {
+        .allocated = n,
+        .aligned = n,
+        .offset = 0,
+        .sizes = {3},
+        .strides = {1}
+    };
+    MemRefDescriptor<float, 2> raster2camera_desc = {
+        .allocated = &raster2camera[0][0],
+        .aligned = &raster2camera[0][0],
+        .offset = 0,
+        .sizes = {4, 4},
+        .strides = {4, 1}
+    };
+    MemRefDescriptor<float, 2> camera2world_desc = {
+        .allocated = &camera2world[0][0],
+        .aligned = &camera2world[0][0],
+        .offset = 0,
+        .sizes = {4, 4},
+        .strides = {4, 1}
+    };
+    MemRefDescriptor<float, 2> image_desc = {
+        .allocated = image,
+        .aligned = image,
+        .offset = 0,
+        .sizes = {height, width},
+        .strides = {width, 1}
+    };
 
-    printf("[volume ispc 1 core]:\t\t[%.3f] million cycles\n", minISPC);
-    writePPM(image, width, height, "volume-ispc-1core.ppm");
+    reset_and_start_timer();
 
-    // Clear out the buffer
-    for (int i = 0; i < width * height; ++i)
-        image[i] = 0.;
-
-    //
-    // Compute the image using the ispc implementation that also uses
-    // tasks; report the minimum time of three runs.
-    //
-    double minISPCtasks = 1e30;
-    for (unsigned int i = 0; i < test_iterations[1]; ++i) {
-        reset_and_start_timer();
-        volume_ispc_tasks(density, n, raster2camera, camera2world, width, height, image);
-        double dt = get_elapsed_mcycles();
-        printf("@time of ISPC + TASKS run:\t\t\t[%.3f] million cycles\n", dt);
-        minISPCtasks = std::min(minISPCtasks, dt);
-    }
-
-    printf("[volume ispc + tasks]:\t\t[%.3f] million cycles\n", minISPCtasks);
-    writePPM(image, width, height, "volume-ispc-tasks.ppm");
-
-    // Clear out the buffer
-    for (int i = 0; i < width * height; ++i)
-        image[i] = 0.;
-#endif
-
-    //
-    // And run the serial implementation 3 times, again reporting the
-    // minimum time.
-    //
-    double minSerial = 1e30;
-    for (unsigned int i = 0; i < test_iterations[2]; ++i) {
-        reset_and_start_timer();
+    #ifdef INTRINSIC_COMPILER
+        _mlir_ciface_volume_serial(&density_desc, &nVoxels_desc, &raster2camera_desc, &camera2world_desc, width, height, &image_desc);
+    #else
         volume_serial(density, n, &raster2camera[0][0], &camera2world[0][0], width, height, image);
-        double dt = get_elapsed_mcycles();
-        printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
-        minSerial = std::min(minSerial, dt);
-    }
+    #endif
 
-    printf("[volume serial]:\t\t[%.3f] million cycles\n", minSerial);
+    double dt = get_elapsed_mcycles();
+    printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
+
     writePPM(image, width, height, "volume-serial.ppm");
-
-#if 0
-    printf("\t\t\t\t(%.2fx speedup from ISPC, %.2fx speedup from ISPC + tasks)\n", minSerial / minISPC,
-           minSerial / minISPCtasks);
-#endif
 
     return 0;
 }

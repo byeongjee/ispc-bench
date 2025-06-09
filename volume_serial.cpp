@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <math.h>
+#include "volume_serial.h"
 
 #define RESTRICT __restrict__
 

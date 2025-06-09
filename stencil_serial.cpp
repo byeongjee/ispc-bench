@@ -30,6 +30,7 @@
    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+#include "stencil_serial.h"
 
 static void stencil_step(int x0, int x1, int y0, int y1, int z0, int z1, int Nx, int Ny, int Nz, const float *__restrict__ coef,
                          const float *__restrict__ vsq, const float *__restrict__ Ain, float *__restrict__ Aout) {
@@ -55,7 +56,7 @@ static void stencil_step(int x0, int x1, int y0, int y1, int z0, int z1, int Nx,
     }
 }
 
-void loop_stencil_serial(int t0, int t1, int x0, int x1, int y0, int y1, int z0, int z1, int Nx, int Ny, int Nz,
+void stencil_serial(int t0, int t1, int x0, int x1, int y0, int y1, int z0, int z1, int Nx, int Ny, int Nz,
                          const float *__restrict__ coef, const float *__restrict__ vsq, float *__restrict__ Aeven, float *__restrict__ Aodd) {
     for (int t = t0; t < t1; ++t) {
         if ((t & 1) == 0)

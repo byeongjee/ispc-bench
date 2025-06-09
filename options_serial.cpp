@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <math.h>
+#include "options_serial.h"
 
 // Cumulative normal distribution function
 static inline float CND(float X) {
@@ -99,5 +100,13 @@ void binomial_put_serial(float *__restrict__ Sa, float *__restrict__ Xa, float *
                 V[k] = ((1 - Pu) * V[k] + Pu * V[k + 1]) / disc;
 
         result[i] = V[0];
+    }
+}
+
+void options_serial(float Sa[], float Xa[], float Ta[], float ra[], float va[], float result[], int count, bool isBlackScholes) {
+    if (isBlackScholes) {
+        black_scholes_serial(Sa, Xa, Ta, ra, va, result, count);
+    } else {
+        binomial_put_serial(Sa, Xa, Ta, ra, va, result, count);
     }
 }
