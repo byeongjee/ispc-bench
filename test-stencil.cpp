@@ -92,14 +92,24 @@ int main() {
 
   reset_and_start_timer();
   #ifdef INTRINSIC_COMPILER
-    _mlir_ciface_stencil_serial(0, 6, WIDTH, NX - WIDTH, WIDTH, NY - WIDTH, WIDTH, NZ - WIDTH,
-                                NX, NY, NZ, &coeff_desc, &vsq_desc, &Aeven_desc, &Aodd_desc);
+    _mlir_ciface_stencil_serial(&coeff_desc, &vsq_desc, &Aeven_desc, &Aodd_desc);
   #else
-    stencil_serial(0, 6, WIDTH, NX - WIDTH, WIDTH, NY - WIDTH, WIDTH, NZ - WIDTH,
-                  NX, NY, NZ, coeff, vsq, Aserial[0], Aserial[1]);
+    stencil_serial(coeff, vsq, Aserial[0], Aserial[1]);
   #endif
   double dt = get_elapsed_mcycles();
-  printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
+  printf ("[execution time] %0.6f\n", dt);
+
+  const char *refOut = "stencil_ref_f32.bin";
+  FILE *f = fopen(refOut, "wb");
+  if (f) {
+      size_t n = NX * NY * NZ;
+      fwrite(Aserial_even, sizeof(float), n, f);
+      fclose(f);
+      printf("Reference field written: %s (%.1f MB)\n",
+              refOut, n*sizeof(float)/1.0e6);
+  } else {
+      puts("Failed to open output file!");
+  }
 
   return 0;
 }

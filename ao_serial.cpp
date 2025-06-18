@@ -300,7 +300,6 @@ ao_scanlines(int y0, int y1, int w, int h, int nsubsamples, float image[]) {
   }
 }
 
-void __attribute__((annotate("llvm.emit_c_interface")))
-ao_serial(int nsubsamples, float image[]) {
+void ao_serial(int nsubsamples, float image[]) {
   ao_scanlines(0, HEIGHT, WIDTH, HEIGHT, nsubsamples, image);
 }

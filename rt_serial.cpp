@@ -38,228 +38,251 @@
 #pragma warning(disable : 4305)
 #endif
 
-#include <algorithm>
-#include <stdint.h>
-#include <iostream>
 #include "rt_serial.h"
+#include "timing.h"
+#include <algorithm>
+#include <assert.h>
+#include <iostream>
+#include <stdint.h>
+#include <string.h>
 
 struct float3 {
-    float3() {}
-    float3(float xx, float yy, float zz) {
-        x = xx;
-        y = yy;
-        z = zz;
-    }
+  float3() {}
+  float3(float xx, float yy, float zz) {
+    x = xx;
+    y = yy;
+    z = zz;
+  }
 
-    float3 operator*(float f) const { return float3(x * f, y * f, z * f); }
-    float3 operator-(const float3 &f2) const { return float3(x - f2.x, y - f2.y, z - f2.z); }
-    float3 operator*(const float3 &f2) const { return float3(x * f2.x, y * f2.y, z * f2.z); }
-    float x, y, z;
-    float pad; // match padding/alignment of ispc version
-}
-__attribute__((aligned(16)));
+  float3 operator*(float f) const { return float3(x * f, y * f, z * f); }
+  float3 operator-(const float3 &f2) const {
+    return float3(x - f2.x, y - f2.y, z - f2.z);
+  }
+  float3 operator*(const float3 &f2) const {
+    return float3(x * f2.x, y * f2.y, z * f2.z);
+  }
+  float x, y, z;
+  float pad; // match padding/alignment of ispc version
+} __attribute__((aligned(16)));
 
 struct Ray {
-    float3 origin, dir, invDir;
-    unsigned int dirIsNeg[3];
-    float mint, maxt;
-    int hitId;
+  float3 origin, dir, invDir;
+  unsigned int dirIsNeg[3];
+  float mint, maxt;
+  int hitId;
 };
 
-
-__attribute__((always_inline))
-inline float3 Cross(const float3 &v1, const float3 &v2) {
-    float v1x = v1.x, v1y = v1.y, v1z = v1.z;
-    float v2x = v2.x, v2y = v2.y, v2z = v2.z;
-    float3 ret;
-    ret.x = (v1y * v2z) - (v1z * v2y);
-    ret.y = (v1z * v2x) - (v1x * v2z);
-    ret.z = (v1x * v2y) - (v1y * v2x);
-    return ret;
+__attribute__((always_inline)) inline float3 Cross(const float3 &v1,
+                                                   const float3 &v2) {
+  float v1x = v1.x, v1y = v1.y, v1z = v1.z;
+  float v2x = v2.x, v2y = v2.y, v2z = v2.z;
+  float3 ret;
+  ret.x = (v1y * v2z) - (v1z * v2y);
+  ret.y = (v1z * v2x) - (v1x * v2z);
+  ret.z = (v1x * v2y) - (v1y * v2x);
+  return ret;
 }
 
-__attribute__((always_inline))
-inline float Dot(const float3 &a, const float3 &b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-
-__attribute__((always_inline))
-static void generateRay(
-                     float *__restrict__ raster2camera_ptr,
-                     float *__restrict__ camera2world_ptr,
-    float x, float y, Ray &ray) {
-
-    auto &raster2camera = *(float (*)[4][4])(raster2camera_ptr);
-    auto &camera2world = *(float (*)[4][4])(camera2world_ptr);
-
-
-    ray.mint = 0.f;
-    ray.maxt = 1e30f;
-
-    ray.hitId = 0;
-
-    // transform raster coordinate (x, y, 0) to camera space
-    float camx = raster2camera[0][0] * x + raster2camera[0][1] * y + raster2camera[0][3];
-    float camy = raster2camera[1][0] * x + raster2camera[1][1] * y + raster2camera[1][3];
-    float camz = raster2camera[2][3];
-    float camw = raster2camera[3][3];
-    camx /= camw;
-    camy /= camw;
-    camz /= camw;
-
-    ray.dir.x = camera2world[0][0] * camx + camera2world[0][1] * camy + camera2world[0][2] * camz;
-    ray.dir.y = camera2world[1][0] * camx + camera2world[1][1] * camy + camera2world[1][2] * camz;
-    ray.dir.z = camera2world[2][0] * camx + camera2world[2][1] * camy + camera2world[2][2] * camz;
-
-    ray.origin.x = camera2world[0][3] / camera2world[3][3];
-    ray.origin.y = camera2world[1][3] / camera2world[3][3];
-    ray.origin.z = camera2world[2][3] / camera2world[3][3];
-
-    ray.invDir.x = 1.f / ray.dir.x;
-    ray.invDir.y = 1.f / ray.dir.y;
-    ray.invDir.z = 1.f / ray.dir.z;
-
-    ray.dirIsNeg[0] = (ray.invDir.x < 0) ? 1 : 0;
-    ray.dirIsNeg[1] = (ray.invDir.y < 0) ? 1 : 0;
-    ray.dirIsNeg[2] = (ray.invDir.z < 0) ? 1 : 0;
+__attribute__((always_inline)) inline float Dot(const float3 &a,
+                                                const float3 &b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-__attribute__((always_inline))
-static inline bool BBoxIntersect(const float bounds[2][3], const Ray &ray) {
-    float3 bounds0(bounds[0][0], bounds[0][1], bounds[0][2]);
-    float3 bounds1(bounds[1][0], bounds[1][1], bounds[1][2]);
-    float t0 = ray.mint, t1 = ray.maxt;
+using Mat4 = float[4][4];
 
-    float3 tNear = (bounds0 - ray.origin) * ray.invDir;
-    float3 tFar = (bounds1 - ray.origin) * ray.invDir;
-    if (tNear.x > tFar.x) {
-        float tmp = tNear.x;
-        tNear.x = tFar.x;
-        tFar.x = tmp;
-    }
-    t0 = std::max(tNear.x, t0);
-    t1 = std::min(tFar.x, t1);
+__attribute__((always_inline)) static void
+generateRay(const Mat4 &__restrict__ raster2camera,
+            const Mat4 &__restrict__ camera2world, float x, float y, Ray &ray) {
 
-    if (tNear.y > tFar.y) {
-        float tmp = tNear.y;
-        tNear.y = tFar.y;
-        tFar.y = tmp;
-    }
-    t0 = std::max(tNear.y, t0);
-    t1 = std::min(tFar.y, t1);
+  ray.mint = 0.f;
+  ray.maxt = 1e30f;
 
-    if (tNear.z > tFar.z) {
-        float tmp = tNear.z;
-        tNear.z = tFar.z;
-        tFar.z = tmp;
-    }
-    t0 = std::max(tNear.z, t0);
-    t1 = std::min(tFar.z, t1);
+  ray.hitId = 0;
 
-    return (t0 <= t1);
+  // transform raster coordinate (x, y, 0) to camera space
+  float camx =
+      raster2camera[0][0] * x + raster2camera[0][1] * y + raster2camera[0][3];
+  float camy =
+      raster2camera[1][0] * x + raster2camera[1][1] * y + raster2camera[1][3];
+  float camz = raster2camera[2][3];
+  float camw = raster2camera[3][3];
+  camx /= camw;
+  camy /= camw;
+  camz /= camw;
+
+  ray.dir.x = camera2world[0][0] * camx + camera2world[0][1] * camy +
+              camera2world[0][2] * camz;
+  ray.dir.y = camera2world[1][0] * camx + camera2world[1][1] * camy +
+              camera2world[1][2] * camz;
+  ray.dir.z = camera2world[2][0] * camx + camera2world[2][1] * camy +
+              camera2world[2][2] * camz;
+
+  ray.origin.x = camera2world[0][3] / camera2world[3][3];
+  ray.origin.y = camera2world[1][3] / camera2world[3][3];
+  ray.origin.z = camera2world[2][3] / camera2world[3][3];
+
+  ray.invDir.x = 1.f / ray.dir.x;
+  ray.invDir.y = 1.f / ray.dir.y;
+  ray.invDir.z = 1.f / ray.dir.z;
+
+  ray.dirIsNeg[0] = (ray.invDir.x < 0) ? 1 : 0;
+  ray.dirIsNeg[1] = (ray.invDir.y < 0) ? 1 : 0;
+  ray.dirIsNeg[2] = (ray.invDir.z < 0) ? 1 : 0;
 }
 
-__attribute__((always_inline))
-inline bool TriIntersect(const Triangle &tri, Ray &ray) {
-    float3 p0(tri.p[0][0], tri.p[0][1], tri.p[0][2]);
-    float3 p1(tri.p[1][0], tri.p[1][1], tri.p[1][2]);
-    float3 p2(tri.p[2][0], tri.p[2][1], tri.p[2][2]);
-    float3 e1 = p1 - p0;
-    float3 e2 = p2 - p0;
+__attribute__((always_inline)) static inline bool
+BBoxIntersect(const float bounds[2][3], const Ray &ray) {
+  float3 bounds0(bounds[0][0], bounds[0][1], bounds[0][2]);
+  float3 bounds1(bounds[1][0], bounds[1][1], bounds[1][2]);
+  float t0 = ray.mint, t1 = ray.maxt;
 
-    float3 s1 = Cross(ray.dir, e2);
-    float divisor = Dot(s1, e1);
+  float3 tNear = (bounds0 - ray.origin) * ray.invDir;
+  float3 tFar = (bounds1 - ray.origin) * ray.invDir;
+  if (tNear.x > tFar.x) {
+    float tmp = tNear.x;
+    tNear.x = tFar.x;
+    tFar.x = tmp;
+  }
+  t0 = std::max(tNear.x, t0);
+  t1 = std::min(tFar.x, t1);
 
-    if (divisor == 0.)
-        return false;
-    float invDivisor = 1.f / divisor;
+  if (tNear.y > tFar.y) {
+    float tmp = tNear.y;
+    tNear.y = tFar.y;
+    tFar.y = tmp;
+  }
+  t0 = std::max(tNear.y, t0);
+  t1 = std::min(tFar.y, t1);
 
-    // Compute first barycentric coordinate
-    float3 d = ray.origin - p0;
-    float b1 = Dot(d, s1) * invDivisor;
-    if (b1 < 0. || b1 > 1.)
-        return false;
+  if (tNear.z > tFar.z) {
+    float tmp = tNear.z;
+    tNear.z = tFar.z;
+    tFar.z = tmp;
+  }
+  t0 = std::max(tNear.z, t0);
+  t1 = std::min(tFar.z, t1);
 
-    // Compute second barycentric coordinate
-    float3 s2 = Cross(d, e1);
-    float b2 = Dot(ray.dir, s2) * invDivisor;
-    if (b2 < 0. || b1 + b2 > 1.)
-        return false;
-
-    // Compute _t_ to intersection point
-    float t = Dot(e2, s2) * invDivisor;
-    if (t < ray.mint || t > ray.maxt)
-        return false;
-
-    ray.maxt = t;
-    ray.hitId = tri.id;
-    return true;
+  return (t0 <= t1);
 }
 
-static
-__attribute__((always_inline))
-bool BVHIntersect(const LinearBVHNode *__restrict__ nodes, const Triangle *__restrict__ tris, Ray &r) {
-      Ray ray = r;
-    bool hit = false;
-    // Follow ray through BVH nodes to find primitive intersections
-    int todoOffset = 0, nodeNum = 0;
-    int todo[64];
+__attribute__((always_inline)) inline bool TriIntersect(const Triangle &tri,
+                                                        Ray &ray) {
+  float3 p0(tri.p[0][0], tri.p[0][1], tri.p[0][2]);
+  float3 p1(tri.p[1][0], tri.p[1][1], tri.p[1][2]);
+  float3 p2(tri.p[2][0], tri.p[2][1], tri.p[2][2]);
+  float3 e1 = p1 - p0;
+  float3 e2 = p2 - p0;
 
-    while (true) {
-        // Check ray against BVH node
-        const LinearBVHNode &node = nodes[nodeNum];
-        if (BBoxIntersect(node.bounds, ray)) {
-            unsigned int nPrimitives = node.nPrimitives;
-            if (nPrimitives > 0) {
-                // Intersect ray with primitives in leaf BVH node
-                unsigned int primitivesOffset = node.offset;
-                for (unsigned int i = 0; i < nPrimitives; ++i) {
-                    if (TriIntersect(tris[primitivesOffset + i], ray))
-                        hit = true;
-                }
-                if (todoOffset == 0)
-                    break;
-                nodeNum = todo[--todoOffset];
-            } else {
-                // Put far BVH node on _todo_ stack, advance to near node
-                if (r.dirIsNeg[node.splitAxis]) {
-                    todo[todoOffset++] = nodeNum + 1;
-                    nodeNum = node.offset;
-                } else {
-                    todo[todoOffset++] = node.offset;
-                    nodeNum = nodeNum + 1;
-                }
-            }
+  float3 s1 = Cross(ray.dir, e2);
+  float divisor = Dot(s1, e1);
+
+  if (divisor == 0.)
+    return false;
+  float invDivisor = 1.f / divisor;
+
+  // Compute first barycentric coordinate
+  float3 d = ray.origin - p0;
+  float b1 = Dot(d, s1) * invDivisor;
+  if (b1 < 0. || b1 > 1.)
+    return false;
+
+  // Compute second barycentric coordinate
+  float3 s2 = Cross(d, e1);
+  float b2 = Dot(ray.dir, s2) * invDivisor;
+  if (b2 < 0. || b1 + b2 > 1.)
+    return false;
+
+  // Compute _t_ to intersection point
+  float t = Dot(e2, s2) * invDivisor;
+  if (t < ray.mint || t > ray.maxt)
+    return false;
+
+  ray.maxt = t;
+  ray.hitId = tri.id;
+  return true;
+}
+
+static __attribute__((always_inline)) bool
+BVHIntersect(const LinearBVHNode *__restrict__ nodes,
+             const Triangle *__restrict__ tris, Ray &r) {
+  Ray ray = r;
+  bool hit = false;
+  // Follow ray through BVH nodes to find primitive intersections
+  int todoOffset = 0, nodeNum = 0;
+  int todo[64];
+
+  while (true) {
+    // Check ray against BVH node
+    const LinearBVHNode &node = nodes[nodeNum];
+    if (BBoxIntersect(node.bounds, ray)) {
+      unsigned int nPrimitives = node.nPrimitives;
+      if (nPrimitives > 0) {
+        // Intersect ray with primitives in leaf BVH node
+        unsigned int primitivesOffset = node.offset;
+        for (unsigned int i = 0; i < nPrimitives; ++i) {
+          if (TriIntersect(tris[primitivesOffset + i], ray))
+            hit = true;
+        }
+        if (todoOffset == 0)
+          break;
+        nodeNum = todo[--todoOffset];
+      } else {
+        // Put far BVH node on _todo_ stack, advance to near node
+        if (r.dirIsNeg[node.splitAxis]) {
+          todo[todoOffset++] = nodeNum + 1;
+          nodeNum = node.offset;
         } else {
-            if (todoOffset == 0)
-                break;
-            nodeNum = todo[--todoOffset];
+          todo[todoOffset++] = node.offset;
+          nodeNum = nodeNum + 1;
         }
+      }
+    } else {
+      if (todoOffset == 0)
+        break;
+      nodeNum = todo[--todoOffset];
     }
-    r.maxt = ray.maxt;
-    r.hitId = ray.hitId;
-    return hit;
+  }
+  r.maxt = ray.maxt;
+  r.hitId = ray.hitId;
+  return hit;
 }
 
-void rt_serial(
-                     //const float raster2camera[__restrict__ 4][4],
-                     //const float camera2world[__restrict__ 4][4],
-                     float *__restrict__ raster2camera_ptr,
-                     float *__restrict__ camera2world_ptr,
+// extern "C" int rt_serial2(Ray r) {
+//     if (r.dir.x == 0) {
+//       return 1;
+//     }
+//     if (r.origin.y == 0) {
+//       return 2;
+//     }
+//     if (r.mint == 0) {
+//       return 3;
+//     }
+//     if (r.maxt == 0) {
+//       return 4;
+//     }
+//     return 0;
+// }
 
-                     float *__restrict__ image, int *__restrict__ id, const LinearBVHNode *__restrict__ nodes,
-                     const Triangle *__restrict__ triangles) {
-
-    float widthScale = float(BASE_WIDTH) / float(WIDTH);
-    float heightScale = float(BASE_HEIGHT) / float(HEIGHT);
-
-    for (int y = 0; y < HEIGHT; ++y) {
-        for (int x = 0; x < WIDTH; ++x) {
-            Ray ray;
-            generateRay(raster2camera_ptr, camera2world_ptr, x * widthScale, y * heightScale, ray);
-            BVHIntersect(nodes, triangles, ray);
-
-            int offset = y * WIDTH + x;
-            image[offset] = ray.maxt;
-            id[offset] = ray.hitId;
-        }
-    }
-}
+ void rt_serial(
+    const Mat4 &raster2camera,
+    const Mat4 &camera2world,
+    float *__restrict__ image, int *__restrict__ id,
+    const LinearBVHNode *__restrict__ nodes,
+    const Triangle *__restrict__ triangles
+ ) {
+  float widthScale = 1.f;
+  float heightScale = 1.f;
+ 
+   for (int y = 0; y < HEIGHT; ++y) {
+     for (int x = 0; x < WIDTH; ++x) {
+       Ray ray;
+       generateRay(raster2camera, camera2world, x * widthScale, y * heightScale,
+                   ray);
+       BVHIntersect(nodes, triangles, ray);
+ 
+       int offset = y * WIDTH + x;
+       image[offset] = ray.maxt;
+       id[offset] = ray.hitId;
+     }
+   }
+ }

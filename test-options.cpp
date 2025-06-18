@@ -143,7 +143,7 @@ int main() {
         sum += result[i];
     }
 
-    double total = binomial_serial + bs_serial;
+    double total = bs_serial;
     printf ("[execution time] %0.6f\n", total);
 
 

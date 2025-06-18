@@ -56,12 +56,24 @@ static void stencil_step(int x0, int x1, int y0, int y1, int z0, int z1, int Nx,
     }
 }
 
-void stencil_serial(int t0, int t1, int x0, int x1, int y0, int y1, int z0, int z1, int Nx, int Ny, int Nz,
+void stencil_serial(
                          const float *__restrict__ coef, const float *__restrict__ vsq, float *__restrict__ Aeven, float *__restrict__ Aodd) {
-    for (int t = t0; t < t1; ++t) {
-        if ((t & 1) == 0)
-            stencil_step(x0, x1, y0, y1, z0, z1, Nx, Ny, Nz, coef, vsq, Aeven, Aodd);
-        else
-            stencil_step(x0, x1, y0, y1, z0, z1, Nx, Ny, Nz, coef, vsq, Aodd, Aeven);
-    }
+  int t0 = 0;
+  int t1 = 6;
+  int x0 = WIDTH;
+  int x1 = NX - WIDTH;
+  int y0 = WIDTH;
+  int y1 = NY - WIDTH;
+  int z0 = WIDTH;
+  int z1 = NZ - WIDTH;
+  int Nx = NX;
+  int Ny = NY;
+  int Nz = NZ;
+
+  for (int t = t0; t < t1; ++t) {
+    if ((t & 1) == 0)
+      stencil_step(x0, x1, y0, y1, z0, z1, Nx, Ny, Nz, coef, vsq, Aeven, Aodd);
+    else
+      stencil_step(x0, x1, y0, y1, z0, z1, Nx, Ny, Nz, coef, vsq, Aodd, Aeven);
+  }
 }

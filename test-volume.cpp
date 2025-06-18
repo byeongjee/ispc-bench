@@ -148,7 +148,7 @@ int main() {
         .sizes = {n[0] * n[1] * n[2]},
         .strides = {1}
     };
-    MemRefDescriptor<int, 1> nVoxels_desc = {
+    MemRefDescriptor<int, 1> n_desc = {
         .allocated = n,
         .aligned = n,
         .offset = 0,
@@ -169,18 +169,19 @@ int main() {
         .sizes = {4, 4},
         .strides = {4, 1}
     };
-    MemRefDescriptor<float, 2> image_desc = {
+    MemRefDescriptor<float, 1> image_desc = {
         .allocated = image,
         .aligned = image,
         .offset = 0,
-        .sizes = {height, width},
-        .strides = {width, 1}
+        .sizes = {height * width},
+        .strides = {1}
     };
+    printf("width: %d, height: %d\n", width, height);
 
     reset_and_start_timer();
 
     #ifdef INTRINSIC_COMPILER
-        _mlir_ciface_volume_serial(&density_desc, &nVoxels_desc, &raster2camera_desc, &camera2world_desc, width, height, &image_desc);
+        _mlir_ciface_volume_serial(&density_desc, &n_desc, &raster2camera_desc, &camera2world_desc, width, height, &image_desc);
     #else
         volume_serial(density, n, &raster2camera[0][0], &camera2world[0][0], width, height, image);
     #endif
@@ -188,7 +189,21 @@ int main() {
     double dt = get_elapsed_mcycles();
     printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
 
-    writePPM(image, width, height, "volume-serial.ppm");
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            printf("%f ", raster2camera[i][j]);
+        }
+        printf("\n");
+    }
+
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            printf("%f ", camera2world[i][j]);
+        }
+        printf("\n");
+    }
+
+      writePPM(image, width, height, "volume-serial.ppm");
 
     return 0;
 }

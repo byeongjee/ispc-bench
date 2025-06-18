@@ -238,7 +238,7 @@ int main() {
     #ifdef INTRINSIC_COMPILER
         _mlir_ciface_rt_serial(&raster2camera_desc, &camera2world_desc, &image_desc, &id_desc, &nodes_desc, &triangles_desc);
     #else
-        rt_serial(&raster2camera[0][0], &camera2world[0][0], image, id, nodes, triangles);
+        rt_serial(raster2camera, camera2world, image, id, nodes, triangles);
     #endif
     double dt = get_elapsed_mcycles();
     printf ("[execution time] %0.6f\n", dt);
