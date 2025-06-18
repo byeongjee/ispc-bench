@@ -48,7 +48,7 @@ using std::max;
 
 
 int main() {
-    int nOptions = 128 * 1024;
+    int nOptions = 1024 * 8192;
 
     float *S = new float[nOptions];
     float *X = new float[nOptions];
