@@ -42,7 +42,7 @@
 using std::max;
 
 #include "timing.h"
-#include "options_serial.h"
+#include "binomial_put_serial.h"
 
 //using namespace ispc;
 
@@ -119,33 +119,20 @@ int main() {
     //
     reset_and_start_timer();
     #ifdef INTRINSIC_COMPILER
-        _mlir_ciface_options_serial(&S_desc, &X_desc, &T_desc, &r_desc, &v_desc, &result_desc, nOptions, false);
+        _mlir_ciface_binomial_put_serial(&S_desc, &X_desc, &T_desc, &r_desc, &v_desc, &result_desc, nOptions);
     #else
-        options_serial(S, X, T, r, v, result, nOptions, false);
+        binomial_put_serial(S, X, T, r, v, result, nOptions);
     #endif
-    double binomial_serial = get_elapsed_mcycles();
-    sum = 0.;
-    for (int i = 0; i < nOptions; ++i) {
-        sum += result[i];
-    }
-    // printf("[binomial serial]:\t\t[%.3f] million cycles (avg %f)\n", binomial_serial, sum / nOptions);
-
-
-    reset_and_start_timer();
-    #ifdef INTRINSIC_COMPILER
-        _mlir_ciface_options_serial(&S_desc, &X_desc, &T_desc, &r_desc, &v_desc, &result_desc, nOptions, true);
-    #else
-        options_serial(S, X, T, r, v, result, nOptions, true);
-    #endif
-    double bs_serial = get_elapsed_mcycles();
+    double time = get_elapsed_mcycles();
     sum = 0.;
     for (int i = 0; i < nOptions; ++i) {
         sum += result[i];
     }
 
-    double total = bs_serial;
-    printf ("[execution time] %0.6f\n", total);
+    printf("sum = %f\n", sum);
+    printf ("[execution time] %0.6f\n", time);
 
 
     return 0;
 }
+ 

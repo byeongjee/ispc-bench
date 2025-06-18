@@ -42,7 +42,7 @@
 
 #include <algorithm>
 #include <math.h>
-#include "options_serial.h"
+#include "binomial_put_serial.h"
 
 // Cumulative normal distribution function
 static inline float CND(float X) {
@@ -63,18 +63,6 @@ static inline float CND(float X) {
     return w;
 }
 
-void black_scholes_serial(float *__restrict__ Sa, float *__restrict__ Xa, float *__restrict__ Ta, float *__restrict__ ra, float *__restrict__ va, float *__restrict__ result, int count) {
-    for (int i = 0; i < count; ++i) {
-        float S = Sa[i], X = Xa[i];
-        float T = Ta[i], r = ra[i];
-        float v = va[i];
-
-        float d1 = (logf(S / X) + (r + v * v * .5f) * T) / (v * sqrtf(T));
-        float d2 = d1 - v * sqrtf(T);
-
-        result[i] = S * CND(d1) - X * expf(-r * T) * CND(d2);
-    }
-}
 
 void binomial_put_serial(float *__restrict__ Sa, float *__restrict__ Xa, float *__restrict__ Ta, float *__restrict__ ra, float *__restrict__ va, float *__restrict__ result, int count) {
     float V[BINOMIAL_NUM];
@@ -100,13 +88,5 @@ void binomial_put_serial(float *__restrict__ Sa, float *__restrict__ Xa, float *
                 V[k] = ((1 - Pu) * V[k] + Pu * V[k + 1]) / disc;
 
         result[i] = V[0];
-    }
-}
-
-void options_serial(float Sa[], float Xa[], float Ta[], float ra[], float va[], float result[], int count, bool isBlackScholes) {
-    if (isBlackScholes) {
-        black_scholes_serial(Sa, Xa, Ta, ra, va, result, count);
-    } else {
-        binomial_put_serial(Sa, Xa, Ta, ra, va, result, count);
     }
 }

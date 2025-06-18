@@ -13,15 +13,14 @@ struct MemRefDescriptor {
 };
 
 extern "C" {
-void options_serial(float Sa[], float Xa[], float Ta[], float ra[], float va[],
-                    float result[], int count, bool isBlackScholes);
+void black_scholes_serial(float Sa[], float Xa[], float Ta[], float ra[], float va[],
+                    float result[], int count);
 
-void _mlir_ciface_options_serial(MemRefDescriptor<float, 1> *Sa,
+void _mlir_ciface_black_scholes_serial(MemRefDescriptor<float, 1> *Sa,
                                  MemRefDescriptor<float, 1> *Xa,
                                  MemRefDescriptor<float, 1> *Ta,
                                  MemRefDescriptor<float, 1> *ra,
                                  MemRefDescriptor<float, 1> *va,
-                                 MemRefDescriptor<float, 1> *result, int count,
-                                 bool isBlackScholes);
+                                 MemRefDescriptor<float, 1> *result, int count);
 }
 #endif
