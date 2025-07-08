@@ -243,7 +243,19 @@ int main() {
     double dt = get_elapsed_mcycles();
     printf ("[execution time] %0.6f\n", dt);
 
-    writeImage(id, image, width, height, "rt-serial.ppm");
+    #if defined(CLANG12_COMPILER)
+      writeImage(id, image, width, height, "rt-serial-clang12.ppm");
+    #elif defined(CLANG12_WITHOUT_VEC_COMPILER)
+      writeImage(id, image, width, height, "rt-serial-clang12-without-vec.ppm");
+    #elif defined(CLANG18_COMPILER)
+      writeImage(id, image, width, height, "rt-serial-clang18.ppm");
+    #elif defined(CLANG18_WITHOUT_VEC_COMPILER)
+      writeImage(id, image, width, height, "rt-serial-clang18-without-vec.ppm");
+    #elif defined(VEGEN_COMPILER)
+      writeImage(id, image, width, height, "rt-serial-vegen.ppm");
+    #elif defined(INTRINSIC_COMPILER)
+      writeImage(id, image, width, height, "rt-serial-intrinsic.ppm");
+    #endif
 
     return 0;
 }

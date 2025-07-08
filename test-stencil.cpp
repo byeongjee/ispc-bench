@@ -74,7 +74,21 @@ int main() {
   double dt = get_elapsed_mcycles();
   printf ("[execution time] %0.6f\n", dt);
 
-  const char *refOut = "stencil_ref_f32.bin";
+  const char *refOut;
+  #if defined(CLANG12_COMPILER)
+    *refOut = "stencil-clang12.bin";
+  #elif defined(CLANG12_WITHOUT_VEC_COMPILER)
+    *refOut = "stencil-clang12-without-vec.bin";
+  #elif defined(CLANG18_COMPILER)
+    *refOut = "stencil-clang18.bin";
+  #elif defined(CLANG18_WITHOUT_VEC_COMPILER)
+    *refOut = "stencil-clang18-without-vec.bin";
+  #elif defined(VEGEN_COMPILER)
+    *refOut = "stencil-vegen.bin";
+  #elif defined(INTRINSIC_COMPILER)
+    *refOut = "stencil-intrinsic.bin";
+  #endif
+
   FILE *f = fopen(refOut, "wb");
   if (f) {
       size_t n = NX * NY * NZ;

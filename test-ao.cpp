@@ -108,6 +108,19 @@ int main() {
   printf ("[execution time] %0.6f\n", t);
 
   savePPM("ao-serial.ppm", WIDTH, HEIGHT);
+    #if defined(CLANG12_COMPILER)
+      savePPM("ao-serial-clang12.ppm", WIDTH, HEIGHT);
+    #elif defined(CLANG12_WITHOUT_VEC_COMPILER)
+      savePPM("ao-serial-clang12-without-vec.ppm", WIDTH, HEIGHT);
+    #elif defined(CLANG18_COMPILER)
+      savePPM("ao-serial-clang18.ppm", WIDTH, HEIGHT);
+    #elif defined(CLANG18_WITHOUT_VEC_COMPILER)
+      savePPM("ao-serial-clang18-without-vec.ppm", WIDTH, HEIGHT);
+    #elif defined(VEGEN_COMPILER)
+      savePPM("ao-serial-vegen.ppm", WIDTH, HEIGHT);
+    #elif defined(INTRINSIC_COMPILER)
+      savePPM("ao-serial-intrinsic.ppm", WIDTH, HEIGHT);
+    #endif
 
   return 0;
 }
