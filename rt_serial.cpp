@@ -131,9 +131,9 @@ generateRay(const Mat4 &__restrict__ raster2camera,
 }
 
 __attribute__((always_inline)) static inline bool
-BBoxIntersect(const float bounds[2][3], const Ray &ray) {
-  float3 bounds0(bounds[0][0], bounds[0][1], bounds[0][2]);
-  float3 bounds1(bounds[1][0], bounds[1][1], bounds[1][2]);
+BBoxIntersect(const float * bounds, const Ray &ray) {
+  float3 bounds0(bounds[0], bounds[1], bounds[2]);
+  float3 bounds1(bounds[3], bounds[4], bounds[5]);
   float t0 = ray.mint, t1 = ray.maxt;
 
   float3 tNear = (bounds0 - ray.origin) * ray.invDir;
@@ -165,11 +165,13 @@ BBoxIntersect(const float bounds[2][3], const Ray &ray) {
   return (t0 <= t1);
 }
 
-__attribute__((always_inline)) inline bool TriIntersect(const Triangle &tri,
+__attribute__((always_inline)) inline bool TriIntersect(const float *p,
+  const int32_t id,
+  const int32_t pad[3],
                                                         Ray &ray) {
-  float3 p0(tri.p[0][0], tri.p[0][1], tri.p[0][2]);
-  float3 p1(tri.p[1][0], tri.p[1][1], tri.p[1][2]);
-  float3 p2(tri.p[2][0], tri.p[2][1], tri.p[2][2]);
+  float3 p0(p[0], p[1], p[2]);
+  float3 p1(p[4], p[5], p[6]);
+  float3 p2(p[8], p[9], p[10]);
   float3 e1 = p1 - p0;
   float3 e2 = p2 - p0;
 
@@ -198,13 +200,23 @@ __attribute__((always_inline)) inline bool TriIntersect(const Triangle &tri,
     return false;
 
   ray.maxt = t;
-  ray.hitId = tri.id;
+  ray.hitId = id;
   return true;
 }
 
 static __attribute__((always_inline)) bool
-BVHIntersect(const LinearBVHNode *__restrict__ nodes,
-             const Triangle *__restrict__ tris, Ray &r) {
+BVHIntersect(
+    // Triangle
+    const float * p,
+    const int32_t * triangleId,
+    const int32_t* trainglePad,
+    // LinearBVHNode
+    const float* bounds,
+    const int32_t* offset,
+    const uint8_t* nPrimitives,
+    const uint8_t* splitAxis,
+    const uint16_t* nodePad,
+Ray &r) {
   Ray ray = r;
   bool hit = false;
   // Follow ray through BVH nodes to find primitive intersections
@@ -213,26 +225,30 @@ BVHIntersect(const LinearBVHNode *__restrict__ nodes,
 
   while (true) {
     // Check ray against BVH node
-    const LinearBVHNode &node = nodes[nodeNum];
-    if (BBoxIntersect(node.bounds, ray)) {
-      unsigned int nPrimitives = node.nPrimitives;
-      if (nPrimitives > 0) {
+    if (BBoxIntersect(&bounds[6 * nodeNum], ray)) {
+      unsigned int nPrimitivesLocal = nPrimitives[nodeNum];
+      if (nPrimitivesLocal > 0) {
         // Intersect ray with primitives in leaf BVH node
-        unsigned int primitivesOffset = node.offset;
-        for (unsigned int i = 0; i < nPrimitives; ++i) {
-          if (TriIntersect(tris[primitivesOffset + i], ray))
+        unsigned int primitivesOffset = offset[nodeNum];
+        int i = 0;
+        while (i < nPrimitivesLocal) {
+          if (TriIntersect(&p[12 * (primitivesOffset + i)],
+                           triangleId[primitivesOffset + i],
+                           &trainglePad[3 * (primitivesOffset + i)],
+                           ray))
             hit = true;
+          i++;
         }
         if (todoOffset == 0)
           break;
         nodeNum = todo[--todoOffset];
       } else {
         // Put far BVH node on _todo_ stack, advance to near node
-        if (r.dirIsNeg[node.splitAxis]) {
+        if (r.dirIsNeg[splitAxis[nodeNum]]) {
           todo[todoOffset++] = nodeNum + 1;
-          nodeNum = node.offset;
+          nodeNum = offset[nodeNum];
         } else {
-          todo[todoOffset++] = node.offset;
+          todo[todoOffset++] = offset[nodeNum];
           nodeNum = nodeNum + 1;
         }
       }
@@ -267,22 +283,31 @@ BVHIntersect(const LinearBVHNode *__restrict__ nodes,
     const Mat4 &raster2camera,
     const Mat4 &camera2world,
     float *__restrict__ image, int *__restrict__ id,
-    const LinearBVHNode *__restrict__ nodes,
-    const Triangle *__restrict__ triangles
+    // Triangle
+    const float * p,
+    const int32_t * triangleId,
+    const int32_t* trainglePad,
+    // LinearBVHNode
+    const float* bounds,
+    const int32_t* offset,
+    const uint8_t* nPrimitives,
+    const uint8_t* splitAxis,
+    const uint16_t* nodePad
  ) {
   float widthScale = 1.f;
   float heightScale = 1.f;
- 
-   for (int y = 0; y < HEIGHT; ++y) {
-     for (int x = 0; x < WIDTH; ++x) {
-       Ray ray;
-       generateRay(raster2camera, camera2world, x * widthScale, y * heightScale,
-                   ray);
-       BVHIntersect(nodes, triangles, ray);
- 
-       int offset = y * WIDTH + x;
-       image[offset] = ray.maxt;
-       id[offset] = ray.hitId;
-     }
+
+  for (int y = 0; y < HEIGHT; ++y) {
+    for (int x = 0; x < WIDTH; ++x) {
+      Ray ray;
+      generateRay(raster2camera, camera2world, x * widthScale, y * heightScale,
+                  ray);
+      BVHIntersect(p, triangleId, trainglePad, bounds, offset, nPrimitives,
+                   splitAxis, nodePad, ray);
+
+      int offset = y * WIDTH + x;
+      image[offset] = ray.maxt;
+      id[offset] = ray.hitId;
+    }
    }
  }

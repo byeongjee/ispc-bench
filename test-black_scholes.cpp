@@ -57,49 +57,6 @@ int main() {
     float *v = new float[nOptions];
     float *result = new float[nOptions];
 
-    MemRefDescriptor<float, 1> S_desc = {
-        .allocated = S,
-        .aligned = S,
-        .offset = 0,
-        .sizes = {nOptions},
-        .strides = {1}
-    };
-    MemRefDescriptor<float, 1> X_desc = {
-        .allocated = X,
-        .aligned = X,
-        .offset = 0,
-        .sizes = {nOptions},
-        .strides = {1}
-    };
-
-    MemRefDescriptor<float, 1> T_desc = {
-        .allocated = T,
-        .aligned = T,
-        .offset = 0,
-        .sizes = {nOptions},
-        .strides = {1}
-    };
-    MemRefDescriptor<float, 1> r_desc = {
-        .allocated = r,
-        .aligned = r,
-        .offset = 0,
-        .sizes = {nOptions},
-        .strides = {1}
-    };
-    MemRefDescriptor<float, 1> v_desc = {
-        .allocated = v,
-        .aligned = v,
-        .offset = 0,
-        .sizes = {nOptions},
-        .strides = {1}
-    };
-    MemRefDescriptor<float, 1> result_desc = {
-        .allocated = result,
-        .aligned = result,
-        .offset = 0,
-        .sizes = {nOptions},
-        .strides = {1}
-    };
 
     for (int i = 0; i < nOptions; ++i) {
         S[i] = 100; // stock price
@@ -112,11 +69,7 @@ int main() {
     double sum;
 
     reset_and_start_timer();
-    #ifdef INTRINSIC_COMPILER
-        _mlir_ciface_black_scholes_serial(&S_desc, &X_desc, &T_desc, &r_desc, &v_desc, &result_desc, nOptions);
-    #else
-        black_scholes_serial(S, X, T, r, v, result, nOptions);
-    #endif
+    black_scholes_serial(S, X, T, r, v, result, nOptions);
     double time = get_elapsed_mcycles();
     sum = 0.;
     for (int i = 0; i < nOptions; ++i) {

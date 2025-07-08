@@ -32,26 +32,14 @@ int main() {
     unsigned int height = 512;
 
     int *buf = new int[width * height];
-    MemRefDescriptor<int, 2> buf_desc = {
-        .allocated = buf,
-        .aligned = buf,
-        .offset = 0,
-        .sizes = {width, height},
-        .strides = {width, 1}
-    };
-
     // Clear out the buffer
     for (unsigned int i = 0; i < width * height; ++i)
         buf[i] = 0;
 
     reset_and_start_timer();
-    #ifdef INTRINSIC_COMPILER
-        _mlir_ciface_mandelbrot_serial(&buf_desc);
-    #else
-        mandelbrot_serial(buf);
-    #endif
+    mandelbrot_serial(buf);
     double dt = get_elapsed_mcycles();
-  printf ("[execution time] %0.6f\n", dt);
+    printf ("[execution time] %0.6f\n", dt);
 
     writePPM(buf, width, height, "mandelbrot-serial.ppm");
 

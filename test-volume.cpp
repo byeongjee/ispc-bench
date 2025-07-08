@@ -141,50 +141,11 @@ int main() {
     int n[3];
     float *density = loadVolume(density_filename, n);
 
-    MemRefDescriptor<float, 1> density_desc = {
-        .allocated = density,
-        .aligned = density,
-        .offset = 0,
-        .sizes = {n[0] * n[1] * n[2]},
-        .strides = {1}
-    };
-    MemRefDescriptor<int, 1> n_desc = {
-        .allocated = n,
-        .aligned = n,
-        .offset = 0,
-        .sizes = {3},
-        .strides = {1}
-    };
-    MemRefDescriptor<float, 2> raster2camera_desc = {
-        .allocated = &raster2camera[0][0],
-        .aligned = &raster2camera[0][0],
-        .offset = 0,
-        .sizes = {4, 4},
-        .strides = {4, 1}
-    };
-    MemRefDescriptor<float, 2> camera2world_desc = {
-        .allocated = &camera2world[0][0],
-        .aligned = &camera2world[0][0],
-        .offset = 0,
-        .sizes = {4, 4},
-        .strides = {4, 1}
-    };
-    MemRefDescriptor<float, 1> image_desc = {
-        .allocated = image,
-        .aligned = image,
-        .offset = 0,
-        .sizes = {height * width},
-        .strides = {1}
-    };
     printf("width: %d, height: %d\n", width, height);
 
     reset_and_start_timer();
 
-    #ifdef INTRINSIC_COMPILER
-        _mlir_ciface_volume_serial(&density_desc, &n_desc, &raster2camera_desc, &camera2world_desc, width, height, &image_desc);
-    #else
-        volume_serial(density, n, &raster2camera[0][0], &camera2world[0][0], width, height, image);
-    #endif
+    volume_serial(density, n, &raster2camera[0][0], &camera2world[0][0], width, height, image);
 
     double dt = get_elapsed_mcycles();
     printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
@@ -203,7 +164,19 @@ int main() {
         printf("\n");
     }
 
-      writePPM(image, width, height, "volume-serial.ppm");
+    #if defined(CLANG12_COMPILER)
+      writePPM(image, width, height, "volume-serial-clang12.ppm");
+    #elif defined(CLANG12_WITHOUT_VEC_COMPILER)
+      writePPM(image, width, height, "volume-serial-clang12-without-vec.ppm");
+    #elif defined(CLANG18_COMPILER)
+      writePPM(image, width, height, "volume-serial-clang18.ppm");
+    #elif defined(CLANG18_WITHOUT_VEC_COMPILER)
+      writePPM(image, width, height, "volume-serial-clang18-without-vec.ppm");
+    #elif defined(VEGEN_COMPILER)
+      writePPM(image, width, height, "volume-serial-vegen.ppm");
+    #elif defined(INTRINSIC_COMPILER)
+      writePPM(image, width, height, "volume-serial-intrinsic.ppm");
+    #endif
 
     return 0;
 }

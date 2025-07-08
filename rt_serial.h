@@ -2,14 +2,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-template <typename T, size_t N> struct MemRefDescriptor {
-  T *allocated;
-  T *aligned;
-  intptr_t offset;
-  intptr_t sizes[N];
-  intptr_t strides[N];
-};
-
 extern "C" {
 
 struct Triangle {
@@ -34,17 +26,19 @@ struct LinearBVHNode {
 typedef unsigned int uint;
 using Mat4 = float[4][4];
 
-void rt_serial(const Mat4 &raster2camera, const Mat4 &camera2world,
-               float *__restrict__ image, int *__restrict__ id,
-               const LinearBVHNode *__restrict__ nodes,
-               const Triangle *__restrict__ triangles);
-
-void _mlir_ciface_rt_serial(
-    // const float raster2camera[__restrict__ 4][4],
-    // const float camera2world[__restrict__ 4][4],
-    MemRefDescriptor<float, 2> *raster2camera_ptr,
-    MemRefDescriptor<float, 2> *camera2world_ptr,
-    MemRefDescriptor<float, 2> *image_ptr, MemRefDescriptor<int, 2> *id,
-    MemRefDescriptor<LinearBVHNode, 1> *nodes,
-    MemRefDescriptor<Triangle, 1> *triangles);
+ void rt_serial(
+    const Mat4 &raster2camera,
+    const Mat4 &camera2world,
+    float *__restrict__ image, int *__restrict__ id,
+    // Triangle
+    const float * p,
+    const int32_t* triangleId,
+    const int32_t* trainglePad,
+    // LinearBVHNode
+    const float* bounds,
+    const int32_t* offset,
+    const uint8_t* nPrimitives,
+    const uint8_t* splitAxis,
+    const uint16_t* nodePad
+ );
 }

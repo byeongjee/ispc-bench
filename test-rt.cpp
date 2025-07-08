@@ -190,56 +190,56 @@ int main() {
     memset(id, 0, WIDTH * HEIGHT * sizeof(int));
     memset(image, 0, WIDTH * HEIGHT * sizeof(float));
 
-    // Create MemRefDescriptors for the images and the matrices
-    MemRefDescriptor<float, 2> raster2camera_desc = {
-        .allocated = &raster2camera[0][0],
-        .aligned = &raster2camera[0][0],
-        .offset = 0,
-        .sizes = {4, 4},
-        .strides = {4, 1}
-    };
-    MemRefDescriptor<float, 2> camera2world_desc = {
-        .allocated = &camera2world[0][0],
-        .aligned = &camera2world[0][0],
-        .offset = 0,
-        .sizes = {4, 4},
-        .strides = {4, 1}
-    };
-    MemRefDescriptor<float, 2> image_desc = {
-        .allocated = image,
-        .aligned = image,
-        .offset = 0,
-        .sizes = {WIDTH, HEIGHT},
-        .strides = {WIDTH, 1}
-    };
-    MemRefDescriptor<int, 2> id_desc = {
-        .allocated = id,
-        .aligned = id,
-        .offset = 0,
-        .sizes = {WIDTH, HEIGHT},
-        .strides = {WIDTH, 1}
-    };
-    MemRefDescriptor<LinearBVHNode, 1> nodes_desc = {
-        .allocated = nodes,
-        .aligned = nodes,
-        .offset = 0,
-        .sizes = {nNodes},
-        .strides = {1}
-    };
-    MemRefDescriptor<Triangle, 1> triangles_desc = {
-        .allocated = triangles,
-        .aligned = triangles,
-        .offset = 0,
-        .sizes = {nTris},
-        .strides = {1}
-    };
+
+    float *p = new float[3 * 4 * nTris];
+    for (uint i = 0; i < nTris; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            for (int k = 0; k < 4; ++k) {
+                p[i * 12 + j * 4 + k] = triangles[i].p[j][k];
+            }
+        }
+    }
+
+    int32_t *triangleId = new int32_t[nTris];
+    for (uint i = 0; i < nTris; ++i) {
+        triangleId[i] = triangles[i].id;
+    }
+    int32_t *trianglePad = new int32_t[nTris * 3];
+    for (uint i = 0; i < nTris; ++i) {
+      trianglePad[3 * i] = triangles[i].pad[0];
+      trianglePad[3 * i + 1] = triangles[i].pad[1];
+      trianglePad[3 * i + 2] = triangles[i].pad[2];
+    }
+    float *bounds = new float[2 * 3 * nNodes];
+    for (uint i = 0; i < nNodes; ++i) {
+        for (int j = 0; j < 2; ++j) {
+            for (int k = 0; k < 3; ++k) {
+                bounds[i * 6 + j * 3 + k] = nodes[i].bounds[j][k];
+            }
+        }
+    }
+
+    int32_t* offset = new int32_t[nNodes];
+    for (uint i = 0; i < nNodes; ++i) {
+        offset[i] = nodes[i].offset;
+    }
+    uint8_t* nPrimitives = new uint8_t[nNodes];
+    for (uint i = 0; i < nNodes; ++i) {
+        nPrimitives[i] = nodes[i].nPrimitives;
+    }
+    uint8_t* splitAxis = new uint8_t[nNodes];
+    for (uint i = 0; i < nNodes; ++i) {
+        splitAxis[i] = nodes[i].splitAxis;
+    }
+    uint16_t* nodePad = new uint16_t[nNodes];
+    for (uint i = 0; i < nNodes; ++i) {
+        nodePad[i] = nodes[i].pad;
+    }
 
     reset_and_start_timer();
-    #ifdef INTRINSIC_COMPILER
-        _mlir_ciface_rt_serial(&raster2camera_desc, &camera2world_desc, &image_desc, &id_desc, &nodes_desc, &triangles_desc);
-    #else
-        rt_serial(raster2camera, camera2world, image, id, nodes, triangles);
-    #endif
+    rt_serial(raster2camera, camera2world, image, id, 
+    p, triangleId, trianglePad,
+    bounds, offset, nPrimitives, splitAxis, nodePad);
     double dt = get_elapsed_mcycles();
     printf ("[execution time] %0.6f\n", dt);
 

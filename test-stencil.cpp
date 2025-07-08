@@ -66,36 +66,11 @@ int main() {
 
   float coeff[4] = {0.5, -.25, .125, -.0625};
 
-  MemRefDescriptor<float, 1> coeff_desc = {.allocated = coeff,
-                                           .aligned = coeff,
-                                           .offset = 0,
-                                           .sizes = {4},
-                                           .strides = {1}};
-  MemRefDescriptor<float, 1> vsq_desc = {.allocated = vsq,
-                                         .aligned = vsq,
-                                         .offset = 0,
-                                         .sizes = {NX * NY * NZ},
-                                         .strides = {1}};
-  MemRefDescriptor<float, 1> Aeven_desc = {.allocated = Aserial_even,
-                                           .aligned = Aserial_even,
-                                           .offset = 0,
-                                           .sizes = {NX * NY * NZ},
-                                           .strides = {1}};
-  MemRefDescriptor<float, 1> Aodd_desc = {.allocated = Aserial_odd,
-                                          .aligned = Aserial_odd,
-                                          .offset = 0,
-                                          .sizes = {NX * NY * NZ},
-                                          .strides = {1}};
-
   float* Aserial[2] = {Aserial_even, Aserial_odd};
   InitData(NX, NY, NZ, Aserial, vsq);
 
   reset_and_start_timer();
-  #ifdef INTRINSIC_COMPILER
-    _mlir_ciface_stencil_serial(&coeff_desc, &vsq_desc, &Aeven_desc, &Aodd_desc);
-  #else
-    stencil_serial(coeff, vsq, Aserial[0], Aserial[1]);
-  #endif
+  stencil_serial(coeff, vsq, Aserial[0], Aserial[1]);
   double dt = get_elapsed_mcycles();
   printf ("[execution time] %0.6f\n", dt);
 

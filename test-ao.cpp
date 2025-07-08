@@ -101,19 +101,9 @@ int main() {
   img = new unsigned char[WIDTH * HEIGHT * 3];
   fimg = new float[WIDTH * HEIGHT * 3];
 
-  MemRefDescriptor<float, 3> fimg_desc = {
-      fimg, fimg, 0,
-      {HEIGHT, WIDTH, 3}, // sizes
-      {WIDTH * 3, 3, 1}   // strides
-  };
-
   memset((void *)fimg, 0, sizeof(float) * WIDTH * HEIGHT * 3);
   reset_and_start_timer();
-  #ifdef INTRINSIC_COMPILER
-    _mlir_ciface_ao_serial(NSUBSAMPLES, &fimg_desc);
-  #else
-    ao_serial(NSUBSAMPLES, fimg);
-  #endif
+  ao_serial(NSUBSAMPLES, fimg);
   double t = get_elapsed_mcycles();
   printf ("[execution time] %0.6f\n", t);
 
