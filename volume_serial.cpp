@@ -67,11 +67,10 @@ struct Ray {
     float3 origin, dir;
 };
 
-__attribute__((always_inline))
-static void generateRay(const float *RESTRICT raster2camera_ptr, const float *RESTRICT camera2world_ptr, float x, float y, Ray &ray) {
+using Mat4 = float[4][4];
 
-    auto &raster2camera = *(float (*)[4][4])(raster2camera_ptr);
-    auto &camera2world = *(float (*)[4][4])(camera2world_ptr);
+__attribute__((always_inline))
+static void generateRay(const Mat4& raster2camera, const Mat4& camera2world, float x, float y, Ray &ray) {
 
 
     // transform raster coordinate (x, y, 0) to camera space
@@ -264,7 +263,8 @@ static float raymarch(float density[], int nVoxels[3], const Ray &ray) {
     return powf(L, 1.f / 2.2f);
 }
 
-void volume_serial(float *RESTRICT density, int *RESTRICT nVoxels, const float *RESTRICT raster2camera_ptr, const float *RESTRICT camera2world_ptr,
+
+void volume_serial(float *RESTRICT density, int *RESTRICT nVoxels, const Mat4& raster2camera, const Mat4& camera2world,
                    int width, int height, float *RESTRICT image) {
 
   int offset = 0;
