@@ -267,9 +267,9 @@ static float raymarch(float density[], int nVoxels[3], const Ray &ray) {
 void volume_serial(float *RESTRICT density, int *RESTRICT nVoxels, const Mat4& raster2camera, const Mat4& camera2world,
                    int width, int height, float *RESTRICT image) {
 
-  int offset = 0;
   for (int y = 0; y < HEIGHT; ++y) {
-    for (int x = 0; x < WIDTH; ++x, ++offset) {
+    for (int x = 0; x < WIDTH; ++x) {
+      int offset = y * WIDTH + x;
       Ray ray;
       generateRay(raster2camera, camera2world, (float)x, (float)y, ray);
       image[offset] = raymarch(density, nVoxels, ray);
