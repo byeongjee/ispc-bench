@@ -136,7 +136,7 @@ int main() {
     int width, height;
     float raster2camera[4][4], camera2world[4][4];
     loadCamera(camera_filename, &width, &height, raster2camera, camera2world);
-    float *image = new float[width * height];
+    float *image = new float[WIDTH * HEIGHT];
 
     int n[3];
     float *density = loadVolume(density_filename, n);
@@ -145,7 +145,7 @@ int main() {
 
     reset_and_start_timer();
 
-    volume_serial(density, n, &raster2camera[0][0], &camera2world[0][0], width, height, image);
+    volume_serial(density, n, raster2camera, camera2world, WIDTH, HEIGHT, image);
 
     double dt = get_elapsed_mcycles();
     printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
