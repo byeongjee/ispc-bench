@@ -127,8 +127,8 @@ static float *loadVolume(const char *fn, int n[3]) {
 }
 
 int main() {
-    const char* camera_filename = "/home/t-bykang/ispc-bench/camera.dat";
-    const char* density_filename = "/home/t-bykang/ispc-bench/density_lowres.vol";
+    const char* camera_filename = "/home/admin1/byeongjee/ispc-bench/camera.dat";
+    const char* density_filename = "/home/admin1/byeongjee/ispc-bench/density_lowres.vol";
 
     //
     // Load viewing data and the volume density data

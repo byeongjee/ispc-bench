@@ -92,7 +92,7 @@ static void usage() {
 
 int main() {
     float scale = 1.f;
-    const char *filename = "/home/t-bykang/ispc-bench/sponza";
+    const char *filename = "/home/admin1/byeongjee/ispc-bench/sponza";
 
 #define READ(var, n)                                                                                                   \
     if (fread(&(var), sizeof(var), n, f) != (unsigned int)n) {                                                         \
