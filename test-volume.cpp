@@ -39,144 +39,145 @@
 #endif
 
 #include "timing.h"
+#include "volume_serial.h"
 #include <algorithm>
 #include <cstdlib>
 #include <stdio.h>
-#include "volume_serial.h"
-//using namespace ispc;
-
+// using namespace ispc;
 
 /* Write a PPM image file with the image */
 static void writePPM(float *buf, int width, int height, const char *fn) {
-    FILE *fp = fopen(fn, "wb");
-    fprintf(fp, "P6\n");
-    fprintf(fp, "%d %d\n", width, height);
-    fprintf(fp, "255\n");
-    for (int i = 0; i < width * height; ++i) {
-        float v = buf[i] * 255.f;
-        if (v < 0.f)
-            v = 0.f;
-        else if (v > 255.f)
-            v = 255.f;
-        unsigned char c = (unsigned char)v;
-        for (int j = 0; j < 3; ++j)
-            fputc(c, fp);
-    }
-    fclose(fp);
-    printf("Wrote image file %s\n", fn);
+  FILE *fp = fopen(fn, "wb");
+  fprintf(fp, "P6\n");
+  fprintf(fp, "%d %d\n", width, height);
+  fprintf(fp, "255\n");
+  for (int i = 0; i < width * height; ++i) {
+    float v = buf[i] * 255.f;
+    if (v < 0.f)
+      v = 0.f;
+    else if (v > 255.f)
+      v = 255.f;
+    unsigned char c = (unsigned char)v;
+    for (int j = 0; j < 3; ++j)
+      fputc(c, fp);
+  }
+  fclose(fp);
+  printf("Wrote image file %s\n", fn);
 }
 
 /* Load image and viewing parameters from a camera data file.
    FIXME: we should add support to be able to specify viewing parameters
    in the program here directly. */
-static void loadCamera(const char *fn, int *width, int *height, float raster2camera[4][4], float camera2world[4][4]) {
-    FILE *f = fopen(fn, "r");
-    if (!f) {
-        perror(fn);
-        exit(1);
-    }
-    if (fscanf(f, "%d %d", width, height) != 2) {
+static void loadCamera(const char *fn, int *width, int *height,
+                       float raster2camera[4][4], float camera2world[4][4]) {
+  FILE *f = fopen(fn, "r");
+  if (!f) {
+    perror(fn);
+    exit(1);
+  }
+  if (fscanf(f, "%d %d", width, height) != 2) {
+    fprintf(stderr, "Unexpected end of file in camera file\n");
+    exit(1);
+  }
+
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      if (fscanf(f, "%f", &raster2camera[i][j]) != 1) {
         fprintf(stderr, "Unexpected end of file in camera file\n");
         exit(1);
+      }
     }
-
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            if (fscanf(f, "%f", &raster2camera[i][j]) != 1) {
-                fprintf(stderr, "Unexpected end of file in camera file\n");
-                exit(1);
-            }
-        }
+  }
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      if (fscanf(f, "%f", &camera2world[i][j]) != 1) {
+        fprintf(stderr, "Unexpected end of file in camera file\n");
+        exit(1);
+      }
     }
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            if (fscanf(f, "%f", &camera2world[i][j]) != 1) {
-                fprintf(stderr, "Unexpected end of file in camera file\n");
-                exit(1);
-            }
-        }
-    }
-    fclose(f);
+  }
+  fclose(f);
 }
 
 /* Load a volume density file.  Expects the number of x, y, and z samples
    as the first three values (as integer strings), then x*y*z
    floating-point values (also as strings) to give the densities.  */
 static float *loadVolume(const char *fn, int n[3]) {
-    FILE *f = fopen(fn, "r");
-    if (!f) {
-        perror(fn);
-        exit(1);
-    }
+  FILE *f = fopen(fn, "r");
+  if (!f) {
+    perror(fn);
+    exit(1);
+  }
 
-    if (fscanf(f, "%d %d %d", &n[0], &n[1], &n[2]) != 3) {
-        fprintf(stderr, "Couldn't find resolution at start of density file\n");
-        exit(1);
-    }
+  if (fscanf(f, "%d %d %d", &n[0], &n[1], &n[2]) != 3) {
+    fprintf(stderr, "Couldn't find resolution at start of density file\n");
+    exit(1);
+  }
 
-    int count = n[0] * n[1] * n[2];
-    float *v = new float[count];
-    for (int i = 0; i < count; ++i) {
-        if (fscanf(f, "%f", &v[i]) != 1) {
-            fprintf(stderr, "Unexpected end of file at %d'th density value\n", i);
-            exit(1);
-        }
+  int count = n[0] * n[1] * n[2];
+  float *v = new float[count];
+  for (int i = 0; i < count; ++i) {
+    if (fscanf(f, "%f", &v[i]) != 1) {
+      fprintf(stderr, "Unexpected end of file at %d'th density value\n", i);
+      exit(1);
     }
+  }
 
-    return v;
+  return v;
 }
 
 int main() {
-    const char* camera_filename = "/home/admin1/byeongjee/ispc-bench/camera.dat";
-    const char* density_filename = "/home/admin1/byeongjee/ispc-bench/density_lowres.vol";
+  const char *camera_filename = "/home/admin1/byeongjee/ispc-bench/camera.dat";
+  const char *density_filename =
+      "/home/admin1/byeongjee/ispc-bench/density_lowres.vol";
 
-    //
-    // Load viewing data and the volume density data
-    //
-    int width, height;
-    float raster2camera[4][4], camera2world[4][4];
-    loadCamera(camera_filename, &width, &height, raster2camera, camera2world);
-    float *image = new float[WIDTH * HEIGHT];
+  //
+  // Load viewing data and the volume density data
+  //
+  int width, height;
+  float raster2camera[4][4], camera2world[4][4];
+  loadCamera(camera_filename, &width, &height, raster2camera, camera2world);
+  float *image = new float[WIDTH * HEIGHT];
 
-    int n[3];
-    float *density = loadVolume(density_filename, n);
+  int n[3];
+  float *density = loadVolume(density_filename, n);
 
-    printf("width: %d, height: %d\n", width, height);
+  printf("width: %d, height: %d\n", width, height);
 
-    reset_and_start_timer();
+  reset_and_start_timer();
 
-    volume_serial(density, n, raster2camera, camera2world, WIDTH, HEIGHT, image);
+  volume_serial(density, n, raster2camera, camera2world, WIDTH, HEIGHT, image);
 
-    double dt = get_elapsed_mcycles();
-    printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
+  double dt = get_elapsed_mcycles();
+  printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
 
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            printf("%f ", raster2camera[i][j]);
-        }
-        printf("\n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%f ", raster2camera[i][j]);
     }
+    printf("\n");
+  }
 
-    for (int i = 0; i < 4; ++i) {
-        for (int j = 0; j < 4; ++j) {
-            printf("%f ", camera2world[i][j]);
-        }
-        printf("\n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%f ", camera2world[i][j]);
     }
+    printf("\n");
+  }
 
-    #if defined(CLANG12_COMPILER)
-      writePPM(image, width, height, "volume-serial-clang12.ppm");
-    #elif defined(CLANG12_WITHOUT_VEC_COMPILER)
-      writePPM(image, width, height, "volume-serial-clang12-without-vec.ppm");
-    #elif defined(CLANG18_COMPILER)
-      writePPM(image, width, height, "volume-serial-clang18.ppm");
-    #elif defined(CLANG18_WITHOUT_VEC_COMPILER)
-      writePPM(image, width, height, "volume-serial-clang18-without-vec.ppm");
-    #elif defined(VEGEN_COMPILER)
-      writePPM(image, width, height, "volume-serial-vegen.ppm");
-    #elif defined(INTRINSIC_COMPILER)
-      writePPM(image, width, height, "volume-serial-intrinsic.ppm");
-    #endif
+#if defined(CLANG12_COMPILER)
+  writePPM(image, width, height, "volume-serial-clang12.ppm");
+#elif defined(CLANG12_WITHOUT_VEC_COMPILER)
+  writePPM(image, width, height, "volume-serial-clang12-without-vec.ppm");
+#elif defined(CLANG18_COMPILER)
+  writePPM(image, width, height, "volume-serial-clang18.ppm");
+#elif defined(CLANG18_WITHOUT_VEC_COMPILER)
+  writePPM(image, width, height, "volume-serial-clang18-without-vec.ppm");
+#elif defined(VEGEN_COMPILER)
+  writePPM(image, width, height, "volume-serial-vegen.ppm");
+#elif defined(INTRINSIC_COMPILER)
+  writePPM(image, width, height, "volume-serial-intrinsic.ppm");
+#endif
 
-    return 0;
+  return 0;
 }
