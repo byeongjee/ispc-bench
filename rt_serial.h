@@ -18,10 +18,10 @@ struct LinearBVHNode {
   uint16_t pad;
 };
 
-#define WIDTH 900
-#define HEIGHT 900
-#define BASE_WIDTH 900
-#define BASE_HEIGHT 900
+#define WIDTH 248
+#define HEIGHT 248
+#define BASE_WIDTH 248
+#define BASE_HEIGHT 248
 
 typedef unsigned int uint;
 using Mat4 = float[4][4];

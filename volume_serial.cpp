@@ -111,7 +111,7 @@ __attribute__((always_inline)) static bool Inside(float3 p, float3 pMin,
 }
 
 __attribute__((always_inline)) static bool
-IntersectP(const Ray &ray, float3 pMin, float3 pMax, float *hit0, float *hit1) {
+IntersectP(const Ray &ray, float3& pMin, float3& pMax, float *hit0, float *hit1) {
   float t0 = -1e30f, t1 = 1e30f;
 
   float3 tNear = (pMin - ray.origin) / ray.dir;
@@ -165,14 +165,14 @@ D(int x, int y, int z, int nVoxels[3], float density[]) {
 }
 
 __attribute__((always_inline)) static inline float3
-Offset(float3 p, float3 pMin, float3 pMax) {
+Offset(float3& p, float3& pMin, float3& pMax) {
   return float3((p.x - pMin.x) / (pMax.x - pMin.x),
                 (p.y - pMin.y) / (pMax.y - pMin.y),
                 (p.z - pMin.z) / (pMax.z - pMin.z));
 }
 
 __attribute__((always_inline)) static inline float
-Density(float3 Pobj, float3 pMin, float3 pMax, float density[],
+Density(float3& Pobj, float3& pMin, float3& pMax, float density[],
         int nVoxels[3]) {
   if (!Inside(Pobj, pMin, pMax))
     return 0;
@@ -199,7 +199,7 @@ Density(float3 Pobj, float3 pMin, float3 pMax, float density[],
 }
 
 __attribute__((always_inline)) static float
-transmittance(float3 p0, float3 p1, float3 pMin, float3 pMax, float sigma_t,
+transmittance(float3& p0, float3& p1, float3& pMin, float3& pMax, float sigma_t,
               float density[], int nVoxels[3]) {
   float rayT0, rayT1;
   Ray ray;
@@ -231,8 +231,8 @@ transmittance(float3 p0, float3 p1, float3 pMin, float3 pMax, float sigma_t,
   return expf(-tau);
 }
 
-__attribute__((always_inline)) static float distanceSquared(float3 a,
-                                                            float3 b) {
+__attribute__((always_inline)) static float distanceSquared(float3& a,
+                                                            float3& b) {
   float3 d = a - b;
   return d.x * d.x + d.y * d.y + d.z * d.z;
 }

@@ -149,7 +149,7 @@ int main() {
   volume_serial(density, n, raster2camera, camera2world, WIDTH, HEIGHT, image);
 
   double dt = get_elapsed_mcycles();
-  printf("@time of serial run:\t\t\t[%.3f] million cycles\n", dt);
+  printf ("[execution time] %0.6f\n", dt);
 
   for (int i = 0; i < 4; ++i) {
     for (int j = 0; j < 4; ++j) {

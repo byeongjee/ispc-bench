@@ -107,7 +107,6 @@ int main() {
   double t = get_elapsed_mcycles();
   printf ("[execution time] %0.6f\n", t);
 
-  savePPM("ao-serial.ppm", WIDTH, HEIGHT);
     #if defined(CLANG12_COMPILER)
       savePPM("ao-serial-clang12.ppm", WIDTH, HEIGHT);
     #elif defined(CLANG12_WITHOUT_VEC_COMPILER)

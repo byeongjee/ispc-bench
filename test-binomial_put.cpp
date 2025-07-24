@@ -57,6 +57,8 @@ int main() {
     float *v = new float[nOptions];
     float *result = new float[nOptions];
 
+    printf("nOptions: %d\n", nOptions);
+
     for (int i = 0; i < nOptions; ++i) {
         S[i] = 100; // stock price
         X[i] = 98;  // option strike price

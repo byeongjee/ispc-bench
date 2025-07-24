@@ -64,10 +64,15 @@ static inline float CND(float X) {
 }
 
 
+inline __attribute__((always_inline)) static float
+max(float a, float b) {
+    return (a > b) ? a : b;
+}
+
 void binomial_put_serial(float *__restrict__ Sa, float *__restrict__ Xa, float *__restrict__ Ta, float *__restrict__ ra, float *__restrict__ va, float *__restrict__ result, int count) {
     float V[BINOMIAL_NUM];
 
-    for (int i = 0; i < count; ++i) {
+    for (int i = 0; i < 131072; ++i) {
         float S = Sa[i], X = Xa[i];
         float T = Ta[i], r = ra[i];
         float v = va[i];
@@ -80,7 +85,7 @@ void binomial_put_serial(float *__restrict__ Sa, float *__restrict__ Xa, float *
 
         for (int j = 0; j < BINOMIAL_NUM; ++j) {
             float upow = powf(u, (float)(2 * j - BINOMIAL_NUM));
-            V[j] = std::max(0.f, X - S * upow);
+            V[j] = max(0.f, X - S * upow);
         }
 
         for (int j = BINOMIAL_NUM - 1; j >= 0; --j)

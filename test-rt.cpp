@@ -92,7 +92,7 @@ static void usage() {
 
 int main() {
     float scale = 1.f;
-    const char *filename = "/home/admin1/byeongjee/ispc-bench/sponza";
+    const char *filename = "/home/admin1/byeongjee/ispc-bench/cornell";
 
 #define READ(var, n)                                                                                                   \
     if (fread(&(var), sizeof(var), n, f) != (unsigned int)n) {                                                         \
@@ -124,7 +124,6 @@ int main() {
 
     // We hardcode baseWidth and baseHeight
     // to allow easier analysis
-    assert(baseWidth == 900 && baseHeight == 900);
 
     //
     // Read in the serialized BVH
