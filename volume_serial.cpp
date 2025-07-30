@@ -47,20 +47,33 @@ struct float3 {
     z = zz;
   }
 
+  __attribute__((always_inline)) inline
   float3 operator*(float f) const { return float3(x * f, y * f, z * f); }
+
+  __attribute__((always_inline)) inline
   float3 operator-(const float3 &f2) const {
     return float3(x - f2.x, y - f2.y, z - f2.z);
   }
+
+  __attribute__((always_inline)) inline
   float3 operator*(const float3 &f2) const {
     return float3(x * f2.x, y * f2.y, z * f2.z);
   }
+
+  __attribute__((always_inline)) inline
   float3 operator+(const float3 &f2) const {
     return float3(x + f2.x, y + f2.y, z + f2.z);
   }
+
+  __attribute__((always_inline)) inline
   float3 operator/(const float3 &f2) const {
     return float3(x / f2.x, y / f2.y, z / f2.z);
   }
+
+  __attribute__((always_inline)) inline
   float operator[](int i) const { return (&x)[i]; }
+
+  __attribute__((always_inline)) inline
   float &operator[](int i) { return (&x)[i]; }
 
   float x, y, z;
@@ -75,11 +88,45 @@ struct Ray {
   float3 origin, dir;
 };
 
-using Mat4 = float[4][4];
+__attribute__((always_inline)) inline
+float max(float a, float b) {
+  return (a > b) ? a : b;
+}
+__attribute__((always_inline)) inline
+float min(float a, float b) {
+  return (a < b) ? a : b;
+}
 
+#ifdef VEGEN_COMPILER
+__attribute__((always_inline))
+static void generateRay(const float *RESTRICT raster2camera_ptr, const float *RESTRICT camera2world_ptr, float x, float y, Ray &ray) {
+
+    auto &raster2camera = *(float (*)[4][4])(raster2camera_ptr);
+    auto &camera2world = *(float (*)[4][4])(camera2world_ptr);
+
+
+    // transform raster coordinate (x, y, 0) to camera space
+    float camx = raster2camera[0][0] * x + raster2camera[0][1] * y + raster2camera[0][3];
+    float camy = raster2camera[1][0] * x + raster2camera[1][1] * y + raster2camera[1][3];
+    float camz = raster2camera[2][3];
+    float camw = raster2camera[3][3];
+    camx /= camw;
+    camy /= camw;
+    camz /= camw;
+
+    ray.dir.x = camera2world[0][0] * camx + camera2world[0][1] * camy + camera2world[0][2] * camz;
+    ray.dir.y = camera2world[1][0] * camx + camera2world[1][1] * camy + camera2world[1][2] * camz;
+    ray.dir.z = camera2world[2][0] * camx + camera2world[2][1] * camy + camera2world[2][2] * camz;
+
+    ray.origin.x = camera2world[0][3] / camera2world[3][3];
+    ray.origin.y = camera2world[1][3] / camera2world[3][3];
+    ray.origin.z = camera2world[2][3] / camera2world[3][3];
+}
+#else
 __attribute__((always_inline)) static void
-generateRay(const Mat4 &raster2camera, const Mat4 &camera2world, float x,
+generateRay(const float raster2camera[4][4], const float camera2world[4][4], float x,
             float y, Ray &ray) {
+
 
   // transform raster coordinate (x, y, 0) to camera space
   float camx =
@@ -103,6 +150,7 @@ generateRay(const Mat4 &raster2camera, const Mat4 &camera2world, float x,
   ray.origin.y = camera2world[1][3] / camera2world[3][3];
   ray.origin.z = camera2world[2][3] / camera2world[3][3];
 }
+#endif
 
 __attribute__((always_inline)) static bool Inside(float3 p, float3 pMin,
                                                   float3 pMax) {
@@ -111,7 +159,7 @@ __attribute__((always_inline)) static bool Inside(float3 p, float3 pMin,
 }
 
 __attribute__((always_inline)) static bool
-IntersectP(const Ray &ray, float3& pMin, float3& pMax, float *hit0, float *hit1) {
+IntersectP(const Ray &ray, float3& pMin, float3& pMax, float &hit0, float &hit1) {
   float t0 = -1e30f, t1 = 1e30f;
 
   float3 tNear = (pMin - ray.origin) / ray.dir;
@@ -121,43 +169,47 @@ IntersectP(const Ray &ray, float3& pMin, float3& pMax, float *hit0, float *hit1)
     tNear.x = tFar.x;
     tFar.x = tmp;
   }
-  t0 = std::max(tNear.x, t0);
-  t1 = std::min(tFar.x, t1);
+  t0 = max(tNear.x, t0);
+  t1 = min(tFar.x, t1);
 
   if (tNear.y > tFar.y) {
     float tmp = tNear.y;
     tNear.y = tFar.y;
     tFar.y = tmp;
   }
-  t0 = std::max(tNear.y, t0);
-  t1 = std::min(tFar.y, t1);
+  t0 = max(tNear.y, t0);
+  t1 = min(tFar.y, t1);
 
   if (tNear.z > tFar.z) {
     float tmp = tNear.z;
     tNear.z = tFar.z;
     tFar.z = tmp;
   }
-  t0 = std::max(tNear.z, t0);
-  t1 = std::min(tFar.z, t1);
+  t0 = max(tNear.z, t0);
+  t1 = min(tFar.z, t1);
 
   if (t0 <= t1) {
-    *hit0 = t0;
-    *hit1 = t1;
+    hit0 = t0;
+    hit1 = t1;
     return true;
   } else
     return false;
 }
 
+__attribute__((always_inline)) 
 static inline float Lerp(float t, float a, float b) {
   return (1.f - t) * a + t * b;
 }
 
+__attribute__((always_inline)) 
 static inline int Clamp(int v, int low, int high) {
-  return std::min(std::max(v, low), high);
+  return v < low ? low : (v > high ? high : v);
+  // return std::min(std::max(v, low), high);
 }
 
-__attribute__((always_inline)) static inline float
-D(int x, int y, int z, int nVoxels[3], float density[]) {
+__attribute__((always_inline)) 
+static inline float
+D(int x, int y, int z, int nVoxels[3], float density[NUM_DENSITY]) {
   x = Clamp(x, 0, nVoxels[0] - 1);
   y = Clamp(y, 0, nVoxels[1] - 1);
   z = Clamp(z, 0, nVoxels[2] - 1);
@@ -172,7 +224,7 @@ Offset(float3& p, float3& pMin, float3& pMax) {
 }
 
 __attribute__((always_inline)) static inline float
-Density(float3& Pobj, float3& pMin, float3& pMax, float density[],
+Density(float3& Pobj, float3& pMin, float3& pMax, float density[NUM_DENSITY],
         int nVoxels[3]) {
   if (!Inside(Pobj, pMin, pMax))
     return 0;
@@ -200,17 +252,17 @@ Density(float3& Pobj, float3& pMin, float3& pMax, float density[],
 
 __attribute__((always_inline)) static float
 transmittance(float3& p0, float3& p1, float3& pMin, float3& pMax, float sigma_t,
-              float density[], int nVoxels[3]) {
+              float density[NUM_DENSITY], int nVoxels[3]) {
   float rayT0, rayT1;
   Ray ray;
   ray.origin = p1;
   ray.dir = p0 - p1;
 
   // Find the parametric t range along the ray that is inside the volume.
-  if (!IntersectP(ray, pMin, pMax, &rayT0, &rayT1))
+  if (!IntersectP(ray, pMin, pMax, rayT0, rayT1))
     return 1.;
 
-  rayT0 = std::max(rayT0, 0.f);
+  rayT0 = max(rayT0, 0.f);
 
   // Accumulate beam transmittance in tau
   float tau = 0;
@@ -238,15 +290,15 @@ __attribute__((always_inline)) static float distanceSquared(float3& a,
 }
 
 __attribute__((always_inline)) static float
-raymarch(float density[], int nVoxels[3], const Ray &ray) {
+raymarch(float density[NUM_DENSITY], int nVoxels[3], const Ray &ray) {
   float rayT0, rayT1;
   float3 pMin(.3f, -.2f, .3f), pMax(1.8f, 2.3f, 1.8f);
   float3 lightPos(-1.f, 4.f, 1.5f);
 
-  if (!IntersectP(ray, pMin, pMax, &rayT0, &rayT1))
+  if (!IntersectP(ray, pMin, pMax, rayT0, rayT1))
     return 0.;
 
-  rayT0 = std::max(rayT0, 0.f);
+  rayT0 = max(rayT0, 0.f);
 
   // Parameters that define the volume scattering characteristics and
   // sampling rate for raymarching
@@ -290,9 +342,22 @@ raymarch(float density[], int nVoxels[3], const Ray &ray) {
   return powf(L, 1.f / 2.2f);
 }
 
-void volume_serial(float *RESTRICT density, int *RESTRICT nVoxels,
-                   const Mat4 &raster2camera, const Mat4 &camera2world,
+#ifdef VEGEN_COMPILER
+void volume_serial(float *RESTRICT density, int *RESTRICT nVoxels, const float *RESTRICT raster2camera_ptr, const float *RESTRICT camera2world_ptr,
                    int width, int height, float *RESTRICT image) {
+    int offset = 0;
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x, ++offset) {
+            Ray ray;
+            generateRay(raster2camera_ptr, camera2world_ptr, (float)x, (float)y, ray);
+            image[offset] = raymarch(density, nVoxels, ray);
+        }
+    }
+}
+#else
+void volume_serial(float density[NUM_DENSITY], int nVoxels[3],
+                   const float raster2camera[4][4], const float camera2world[4][4],
+                   int width, int height, float image[LEN_IMAGE]) {
 
   for (int y = 0; y < HEIGHT; ++y) {
     for (int x = 0; x < WIDTH; ++x) {
@@ -303,3 +368,4 @@ void volume_serial(float *RESTRICT density, int *RESTRICT nVoxels,
     }
   }
 }
+#endif

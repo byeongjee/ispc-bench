@@ -191,6 +191,9 @@ __attribute__((always_inline)) static inline void orthoBasis(vec basis[3],
   vnormalize(basis[1]);
 }
 
+const int ntheta = NAO_SAMPLES;
+const int nphi = NAO_SAMPLES;
+
 __attribute__((always_inline)) static float
 ambient_occlusion(Isect &isect, Plane &plane, Sphere *__restrict__ spheres) {
   float eps = 0.0001f;
@@ -202,17 +205,17 @@ ambient_occlusion(Isect &isect, Plane &plane, Sphere *__restrict__ spheres) {
 
   orthoBasis(basis, isect.n);
 
-  static const int ntheta = NAO_SAMPLES;
-  static const int nphi = NAO_SAMPLES;
-  for (int j = 0; j < ntheta; j++) {
-    for (int i = 0; i < nphi; i++) {
+  for (int j = 0; j < NAO_SAMPLES; j++) {
+    for (int i = 0; i < NAO_SAMPLES; i++) {
       Ray ray;
       Isect occIsect;
 
-      float theta = sqrtf(1.0);
-      float phi = 2.0f * M_PI * 1.1;
-      float x = cosf(phi) * theta;
-      float y = sinf(phi) * theta;
+      // float theta = sqrtf(1.0);
+      // float phi = 2.0f * M_PI * 1.1;
+      float theta = sqrtf(drand48());
+      float phi = 2.0f * M_PI * drand48();
+      float x = cos(phi) * theta;
+      float y = sin(phi) * theta;
       float z = sqrtf(1.0f - theta * theta);
 
       // local . global
@@ -256,10 +259,10 @@ ao_scanlines(int y0, int y1, int w, int h, int nsubsamples, float image[]) {
   for (int y = y0; y < y1; ++y) {
     for (int x = 0; x < w; ++x) { // this loop is vectorized
       int offset = 3 * (y * w + x);
-      for (int u = 0; u < nsubsamples; ++u) {
-        for (int v = 0; v < nsubsamples; ++v) {
-          float px = (x + (u / (float)nsubsamples) - (w / 2.0f)) / (w / 2.0f);
-          float py = -(y + (v / (float)nsubsamples) - (h / 2.0f)) / (h / 2.0f);
+      for (int u = 0; u < NSUBSAMPLES; ++u) {
+        for (int v = 0; v < NSUBSAMPLES; ++v) {
+          float px = (x + (u / (float)NSUBSAMPLES) - (w / 2.0f)) / (w / 2.0f);
+          float py = -(y + (v / (float)NSUBSAMPLES) - (h / 2.0f)) / (h / 2.0f);
 
           // Scale NDC based on width/height ratio, supporting non-square image
           // output

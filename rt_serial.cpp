@@ -106,9 +106,9 @@ generateRay(const Mat4 &__restrict__ raster2camera,
       raster2camera[1][0] * x + raster2camera[1][1] * y + raster2camera[1][3];
   float camz = raster2camera[2][3];
   float camw = raster2camera[3][3];
-  camx /= camw;
-  camy /= camw;
-  camz /= camw;
+  camx *= camw;
+  camy *= camw;
+  camz *= camw;
 
   ray.dir.x = camera2world[0][0] * camx + camera2world[0][1] * camy +
               camera2world[0][2] * camz;
@@ -121,9 +121,9 @@ generateRay(const Mat4 &__restrict__ raster2camera,
   ray.origin.y = camera2world[1][3] / camera2world[3][3];
   ray.origin.z = camera2world[2][3] / camera2world[3][3];
 
-  ray.invDir.x = 1.f / ray.dir.x;
-  ray.invDir.y = 1.f / ray.dir.y;
-  ray.invDir.z = 1.f / ray.dir.z;
+  ray.invDir.x = 1.f * ray.dir.x;
+  ray.invDir.y = 1.f * ray.dir.y;
+  ray.invDir.z = 1.f * ray.dir.z;
 
   ray.dirIsNeg[0] = (ray.invDir.x < 0) ? 1 : 0;
   ray.dirIsNeg[1] = (ray.invDir.y < 0) ? 1 : 0;

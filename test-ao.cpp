@@ -54,7 +54,6 @@
 #include "timing.h"
 #include "ao_serial.h"
 
-#define NSUBSAMPLES 2
 
 static unsigned int width, height;
 static unsigned char *img;

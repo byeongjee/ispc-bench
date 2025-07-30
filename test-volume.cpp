@@ -146,24 +146,14 @@ int main() {
 
   reset_and_start_timer();
 
+#ifdef VEGEN_COMPILER
+  volume_serial(density, n, &raster2camera[0][0], &camera2world[0][0], width, height, image);
+#else
   volume_serial(density, n, raster2camera, camera2world, WIDTH, HEIGHT, image);
+#endif
 
   double dt = get_elapsed_mcycles();
   printf ("[execution time] %0.6f\n", dt);
-
-  for (int i = 0; i < 4; ++i) {
-    for (int j = 0; j < 4; ++j) {
-      printf("%f ", raster2camera[i][j]);
-    }
-    printf("\n");
-  }
-
-  for (int i = 0; i < 4; ++i) {
-    for (int j = 0; j < 4; ++j) {
-      printf("%f ", camera2world[i][j]);
-    }
-    printf("\n");
-  }
 
 #if defined(CLANG12_COMPILER)
   writePPM(image, width, height, "volume-serial-clang12.ppm");
